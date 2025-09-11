@@ -1,0 +1,13 @@
+__pycache__/
+model/__pycache__/
+dataset/__pycache__/
+dataops/__pycache__/
+venv/
+output/pretraining
+output/
+client_secrets.json
+.vscode
+.ruff_cache
+start_finetune.sh
+start_pretrain.sh
+master-thesis-presto.json
