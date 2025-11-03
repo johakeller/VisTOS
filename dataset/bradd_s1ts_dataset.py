@@ -30,16 +30,12 @@ class BraDDDataset(IterableDataset):
         batch_size=params.FT_BATCH_SIZE, 
         max_length=None, 
         shuffle=False, 
-        vis_field_size=params.VIS_FIELDS[0], 
         seed=123
     ):
         data_path=os.path.join(params.BRADD_PATH, 'meta.csv')        
         self.seed = seed
         self.rand=random.Random(self.seed)
         self.batch_size=batch_size
-        # length of visual field side
-        self.vis_field_size=vis_field_size
-        self.padding=vis_field_size//2
         # list of names of sample directories for split
         try:
             self.data_frame=pd.read_csv(data_path)
@@ -238,7 +234,6 @@ class BraDDDataset(IterableDataset):
         a pixel time series sample as the input for the VisTOS model.
         '''
 
-        # input dictionary: collect channel groups in dictionary {band_name: numpy array}, labels and masks
         input_dict={}
         input_dict['EO']=eo_data
         input_dict['DW']=dw_data

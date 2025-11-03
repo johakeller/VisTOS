@@ -106,33 +106,12 @@ class FineTuning:
                 vis_field_size=self.vis_field_size,
                 img_width=params.P_IMG_WIDTH,
             ).to(params.DEVICE)
-            # define optimizer
-            optimizer = optim.AdamW(
-                model.parameters(),
-                lr=params.FT_MAX_LR,
-                weight_decay=params.FT_WEIGHT_DECAY,
-                eps=1e-6,
-            )
-
-            # try loading a model from cache if available
-            if checkpointing:
-                model, optimizer, epoch, iteration, loss = self.load_checkpoint(
-                    model, optimizer, epoch, iteration, loss
-                )
-
             # training dataset
-            train_ds = pastis_r_dataset.PastisRDataset(
-                split='train', max_length=params.FT_NUM_TRAIN_SAMPLES, shuffle=True
-            )
+            train_ds = pastis_r_dataset.PastisRDataset(split='train', max_length=params.FT_NUM_TRAIN_SAMPLES, shuffle=True)
             # validation dataset
-            val_ds = pastis_r_dataset.PastisRDataset(
-                split='validation', max_length=params.FT_NUM_VAL_SAMPLES
-            )
+            val_ds = pastis_r_dataset.PastisRDataset(split='validation', max_length=params.FT_NUM_VAL_SAMPLES, shuffle=True)
             # test dataset
-            test_ds = pastis_r_dataset.PastisRDataset(
-                split='test', max_length=params.FT_NUM_TEST_SAMPLES
-            )
-
+            test_ds = pastis_r_dataset.PastisRDataset(split='test', max_length=params.FT_NUM_TEST_SAMPLES, shuffle=True)
             # Focal Tversky loss for rare classes
             loss_1 = TverskyLoss(
                 mode='multiclass',
@@ -143,11 +122,8 @@ class FineTuning:
                 gamma=params.P_TVERSKY_GAMMA,
                 eps=1e-4,
             )
-
             # init inverse-frequency class-weights for CE
-            self.class_weights = (
-                torch.from_numpy(params.P_WEIGHTS).float().to(params.DEVICE)
-            )
+            self.class_weights = (torch.from_numpy(params.P_WEIGHTS).float().to(params.DEVICE))
             # CE for foreground/background separation and stability
             loss_2 = nn.CrossEntropyLoss(
                 label_smoothing=0.1,
@@ -158,47 +134,6 @@ class FineTuning:
                 weight=self.class_weights**params.P_DELTA,
             )
 
-            # dataloaders: training dataloader
-            train_dl = DataLoader(
-                train_ds,
-                batch_size=batch_size,
-                num_workers=params.FT_NUM_WORKERS,
-                drop_last=True,
-            )
-            # validation dataloader
-            val_dl = DataLoader(
-                val_ds,
-                batch_size=batch_size,
-                num_workers=params.FT_NUM_WORKERS,
-                drop_last=True,
-            )
-            # test dataloader
-            test_dl = DataLoader(
-                test_ds,
-                batch_size=batch_size,
-                num_workers=params.FT_NUM_WORKERS,
-                drop_last=True,
-            )
-
-            # start fine-tuning procedure if eval_mode is False
-            if not eval_mode:
-                # run fine-tuning, returns the fine-tuned model
-                model = self.finetune(
-                    model,
-                    optimizer,
-                    train_dl,
-                    val_dl,
-                    loss_1=loss_1,
-                    loss_2=loss_2,
-                    start_epoch=epoch,
-                    start_iteration=iteration,
-                    start_loss=loss,
-                    lambda_1=params.P_LAMBDA_1,
-                    lambda_2=params.P_LAMBDA_2,
-                )
-            # test fine-tuned model (directly accessed with eval_mode)
-            results_dict = self.evaluate(model, test_dl)
-
         # BraDD-S1TS branch
         elif self.dataset == 'BraDD-S1TS':
             # construct the fine-tunig model from the pretrained model
@@ -207,42 +142,70 @@ class FineTuning:
                 vis_field_size=self.vis_field_size,
                 img_width=params.BRADD_IMG_WIDTH,
             ).to(params.DEVICE)
-            # define optimizer
-            optimizer = optim.AdamW(
-                model.parameters(),
-                lr=params.FT_MAX_LR,
-                weight_decay=params.FT_WEIGHT_DECAY,
-            )
-            # start epoch, start iteration, previous loss
-            epoch = 0
-            iteration = 0
-            loss = 0
-
-            # try loading model from cache if available
-            if checkpointing:
-                model, optimizer, epoch, iteration, loss = self.load_checkpoint(
-                    model, optimizer, epoch, iteration, loss
-                )
-
             # training dataset
-            train_ds = bradd_s1ts_dataset.BraDDDataset(
-                split='train',
-                max_length=params.FT_NUM_TRAIN_SAMPLES,
-                shuffle=True,
-                vis_field_size=self.vis_field_size,
-            )
+            train_ds = bradd_s1ts_dataset.BraDDDataset(split='train',max_length=params.FT_NUM_TRAIN_SAMPLES,shuffle=True)
             # validation dataset
-            val_ds = bradd_s1ts_dataset.BraDDDataset(
-                split='validation',
-                max_length=params.FT_NUM_VAL_SAMPLES,
-                vis_field_size=self.vis_field_size,
-            )
+            val_ds = bradd_s1ts_dataset.BraDDDataset(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
             # test dataset
-            test_ds = bradd_s1ts_dataset.BraDDDataset(
-                split='test',
-                max_length=params.FT_NUM_TEST_SAMPLES,
-                vis_field_size=self.vis_field_size,
+            test_ds = bradd_s1ts_dataset.BraDDDataset(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
+            # CE for foreground/background separation and stability
+            loss_2 = nn.CrossEntropyLoss(label_smoothing=params.BRADD_CE_LABEL_SMOOTHING,reduction='mean')
+
+        # define optimizer
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=params.FT_MAX_LR,
+            weight_decay=params.FT_WEIGHT_DECAY,
+            eps=1e-6,
+        )
+
+        # try loading a model from cache if available
+        if checkpointing:
+            model, optimizer, epoch, iteration, loss = self.load_checkpoint(
+                model, optimizer, epoch, iteration, loss
             )
+
+        # dataloaders: training dataloader
+        train_dl = DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            num_workers=params.FT_NUM_WORKERS,
+            drop_last=True,
+        )
+        # validation dataloader
+        val_dl = DataLoader(
+            val_ds,
+            batch_size=batch_size,
+            num_workers=params.FT_NUM_WORKERS,
+            drop_last=True,
+        )
+        # test dataloader
+        test_dl = DataLoader(
+            test_ds,
+            batch_size=batch_size,
+            num_workers=params.FT_NUM_WORKERS,
+            drop_last=True,
+        )
+
+        # start fine-tuning procedure if eval_mode is False
+        if not eval_mode:
+            # run fine-tuning, returns the fine-tuned model
+            model = self.finetune(
+                model,
+                optimizer,
+                train_dl,
+                val_dl,
+                loss_1=loss_1,
+                loss_2=loss_2,
+                start_epoch=epoch,
+                start_iteration=iteration,
+                start_loss=loss,
+                lambda_1=params.P_LAMBDA_1,
+                lambda_2=params.P_LAMBDA_2,
+            )
+        # test fine-tuned model (directly accessed with eval_mode)
+        results_dict = self.evaluate(model, test_dl)
+
 
             # Focal Tversky loss for rare classes 
             loss_1 = TverskyLoss(
@@ -254,11 +217,6 @@ class FineTuning:
                 eps=1e-4,
             )
 
-            # CE for foreground/background separation and stability
-            loss_2 = nn.CrossEntropyLoss(
-                label_smoothing=params.BRADD_CE_LABEL_SMOOTHING,
-                reduction='mean'
-            )
             # dataloaders: training dataloader
             train_dl = DataLoader(
                 train_ds,
