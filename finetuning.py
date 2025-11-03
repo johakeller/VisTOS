@@ -148,8 +148,21 @@ class FineTuning:
             val_ds = bradd_s1ts_dataset.BraDDDataset(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
             # test dataset
             test_ds = bradd_s1ts_dataset.BraDDDataset(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
+            # Focal Tversky loss for rare classes 
+            loss_1 = TverskyLoss(
+                mode='multiclass',
+                from_logits=True,
+                alpha=params.BRADD_TVERSKY_ALPHA,
+                beta=params.BRADD_TVERSKY_BETA,
+                gamma=params.BRADD_TVERSKY_GAMMA,
+                eps=1e-4,
+            )
             # CE for foreground/background separation and stability
             loss_2 = nn.CrossEntropyLoss(label_smoothing=params.BRADD_CE_LABEL_SMOOTHING,reduction='mean')
+        
+        # unknown dataset
+        else:
+            raise ValueError(f'Dataset {self.dataset} unknown.')
 
         # define optimizer
         optimizer = optim.AdamW(
@@ -204,63 +217,7 @@ class FineTuning:
                 lambda_2=params.P_LAMBDA_2,
             )
         # test fine-tuned model (directly accessed with eval_mode)
-        results_dict = self.evaluate(model, test_dl)
-
-
-            # Focal Tversky loss for rare classes 
-            loss_1 = TverskyLoss(
-                mode='multiclass',
-                from_logits=True,
-                alpha=params.BRADD_TVERSKY_ALPHA,
-                beta=params.BRADD_TVERSKY_BETA,
-                gamma=params.BRADD_TVERSKY_GAMMA,
-                eps=1e-4,
-            )
-
-            # dataloaders: training dataloader
-            train_dl = DataLoader(
-                train_ds,
-                batch_size=batch_size,
-                num_workers=params.FT_NUM_WORKERS,
-                drop_last=True,
-            )
-            # validation dataloader
-            val_dl = DataLoader(
-                val_ds,
-                batch_size=batch_size,
-                num_workers=params.FT_NUM_WORKERS,
-                drop_last=True,
-            )
-            # test dataloader
-            test_dl = DataLoader(
-                test_ds,
-                batch_size=batch_size,
-                num_workers=params.FT_NUM_WORKERS,
-                drop_last=True,
-            )
-            # start fine-tuning procedure if eval_mode is False
-            if not eval_mode:
-                # run fine-tuning, returns the fine-tuned model
-                model = self.finetune(
-                    model,
-                    optimizer,
-                    train_dl,
-                    val_dl,
-                    loss_1=loss_1,
-                    loss_2=loss_2,
-                    start_epoch=epoch,
-                    start_iteration=iteration,
-                    start_loss=loss,
-                    lambda_1=params.BRADD_LAMBDA_1,
-                    lambda_2=params.BRADD_LAMBDA_2,
-                )
-            # test fine-tuned model (directly accessed with eval_mode)
-            results_dict = self.evaluate(model, test_dl)
-
-        # unknown dataset
-        else:
-            raise ValueError(f'Dataset {self.dataset} unknown.')
-        
+        results_dict = self.evaluate(model, test_dl)        
         # log multi-class metrics dictionary content to ouput
         self.logger.info('Test metrics:')
         for metric, result in results_dict.items():
