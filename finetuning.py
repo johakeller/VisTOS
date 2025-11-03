@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 import params
 import utils
-from dataset import cdds_dataset, pastis_r_dataset
+from dataset import bradd_s1ts_dataset, pastis_r_dataset
 
 # set scaler for mixed precision training 
 scaler = torch.GradScaler(enabled=torch.cuda.is_available())
@@ -45,11 +45,8 @@ class FineTuning:
     '''
 
     def __init__(self, vis_field_size, dataset):
-        self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'CDDS'
+        self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'BraDD-S1TS'
         self.logger = logging.getLogger('default')
-        # log the per batch loss (for CDDS)
-        self.loss_logging= False if dataset == 'pastis' else True
-        self.loss_logger = logging.getLogger('default_loss')
         self.vis_field_size = vis_field_size
         self.warmup_epochs = params.FT_WARMUP
         self.epochs = params.FT_MAX_EPOCHS
@@ -72,7 +69,7 @@ class FineTuning:
         scratch (loads pretrained model from output directory). Initializes dataset-objects, 
         dataloaders and starts fine-tuning followed by evaluation. If argument eval_mode passed, 
         directly jumps into evaluation. Method has two separate branches: one for PASTIS-R dataset
-        and the other for CDDS dataset. The method can handle two types of models, the VisTOS VF
+        and the other for the BraDD-S1TS dataset. The method can handle two types of models, the VisTOS VF
         model with attention-based spatial enoding and the VisTOS CVF model with convolutional 
         spatial encoding. The type is passed via model_type argument. Cache-loading behavior is 
         defined via checkpointing argument.
@@ -80,9 +77,6 @@ class FineTuning:
 
         # init logger
         self.logger = utils.init_logger(name=f'finetuning_{self.dataset}_{model_type}_vf{self.vis_field_size}')
-        # init loss logger for loss monitoring if loss_logging parameter is set
-        if self.loss_logging:
-            self.loss_logger = utils.init_logger(name=f'training_loss_{self.dataset}_{model_type}_vf{self.vis_field_size}')
         
         # print and log info
         message = (
@@ -205,13 +199,13 @@ class FineTuning:
             # test fine-tuned model (directly accessed with eval_mode)
             results_dict = self.evaluate(model, test_dl)
 
-        # CDDS branch
-        elif self.dataset == 'CDDS':
+        # BraDD-S1TS branch
+        elif self.dataset == 'BraDD-S1TS':
             # construct the fine-tunig model from the pretrained model
             model = pretrained_model.construct_finetuning_model(
-                num_outputs=params.CDDS_NUM_OUTPUTS,
+                num_outputs=params.BRADD_NUM_OUTPUTS,
                 vis_field_size=self.vis_field_size,
-                img_width=params.CDDS_IMG_WIDTH,
+                img_width=params.BRADD_IMG_WIDTH,
             ).to(params.DEVICE)
             # define optimizer
             optimizer = optim.AdamW(
@@ -231,20 +225,20 @@ class FineTuning:
                 )
 
             # training dataset
-            train_ds = cdds_dataset.CDDSDataset(
+            train_ds = bradd_s1ts_dataset.BraDDDataset(
                 split='train',
                 max_length=params.FT_NUM_TRAIN_SAMPLES,
                 shuffle=True,
                 vis_field_size=self.vis_field_size,
             )
             # validation dataset
-            val_ds = cdds_dataset.CDDSDataset(
+            val_ds = bradd_s1ts_dataset.BraDDDataset(
                 split='validation',
                 max_length=params.FT_NUM_VAL_SAMPLES,
                 vis_field_size=self.vis_field_size,
             )
             # test dataset
-            test_ds = cdds_dataset.CDDSDataset(
+            test_ds = bradd_s1ts_dataset.BraDDDataset(
                 split='test',
                 max_length=params.FT_NUM_TEST_SAMPLES,
                 vis_field_size=self.vis_field_size,
@@ -254,20 +248,16 @@ class FineTuning:
             loss_1 = TverskyLoss(
                 mode='multiclass',
                 from_logits=True,
-                alpha=params.CDDS_TVERSKY_ALPHA,
-                beta=params.CDDS_TVERSKY_BETA,
-                gamma=params.CDDS_TVERSKY_GAMMA,
+                alpha=params.BRADD_TVERSKY_ALPHA,
+                beta=params.BRADD_TVERSKY_BETA,
+                gamma=params.BRADD_TVERSKY_GAMMA,
                 eps=1e-4,
             )
-            # init class weights
-            self.class_weights = (
-                torch.from_numpy(params.CDDS_WEIGHTS).float().to(params.DEVICE)
-            )
+
             # CE for foreground/background separation and stability
             loss_2 = nn.CrossEntropyLoss(
-                label_smoothing=params.CDDS_CE_LABEL_SMOOTHING,
-                reduction='mean',
-                weight=self.class_weights,
+                label_smoothing=params.BRADD_CE_LABEL_SMOOTHING,
+                reduction='mean'
             )
             # dataloaders: training dataloader
             train_dl = DataLoader(
@@ -303,8 +293,8 @@ class FineTuning:
                     start_epoch=epoch,
                     start_iteration=iteration,
                     start_loss=loss,
-                    lambda_1=params.CDDS_LAMBDA_1,
-                    lambda_2=params.CDDS_LAMBDA_2,
+                    lambda_1=params.BRADD_LAMBDA_1,
+                    lambda_2=params.BRADD_LAMBDA_2,
                 )
             # test fine-tuned model (directly accessed with eval_mode)
             results_dict = self.evaluate(model, test_dl)
@@ -604,9 +594,6 @@ class FineTuning:
 
                 # extract labels from dictionary
                 label = input_dict['EO_label'].long()
-                # skip CDDS batches that contain only label '0'
-                if self.dataset == 'CDDS' and label.sum() == 0.0:
-                    continue
                 optimizer.zero_grad()
                 # learning rate scheduling via cosine annealing
                 _ = self.adjust_learning_rate(
@@ -628,9 +615,6 @@ class FineTuning:
                         lambda_2=lambda_2
                     )
 
-                    # loss logging if attribute is set
-                    if self.loss_logging:
-                        self.loss_logger.info(loss.item())
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
                     # don't count 0-loss batch in loss calculation   
@@ -739,7 +723,7 @@ class FineTuning:
         # count pixels per image
         pixel_ctr = 0
         # define number of pixel per image
-        total_pixels = (params.CDDS_NUM_PIXELS if self.dataset == 'CDDS' else params.P_NUM_PIXELS)
+        total_pixels = (params.BRADD_NUM_PIXELS if self.dataset == 'BraDD-S1TS' else params.P_NUM_PIXELS)
         # metrics collection lists
         all_preds, all_labels = [], []
         # count images

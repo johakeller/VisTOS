@@ -77,11 +77,11 @@ def main(args):
     of a trained model. The argument 'att' denotes the attention-based spatial 
     encoding architecture, 'conv' refers to the convolutional spatial encoding 
     architecture. The argument 'pastis' is the PASTIS-R fine-tuning dataset, 
-    'cdds' is the Cameroon Deforestation Drivers Segmentation (CDDS) dataset.
+    'bradd' is the BraDD-S1TS (bradd) dataset.
     Pass arguments in the form:
 
     model architecture: 'conv'/ 'att', training type 'finetune/eval', and 
-    dataset: 'pastis'/'cdds', visual field size: '1' (only for att)/'3', '5', 7 
+    dataset: 'pastis'/'bradd', visual field size: '1' (only for att)/'3', '5', 7 
     (only for conv) for a fine-tuning setup
 
     model architecture: 'conv'/ 'att', 'pretrain', and visual field size: '1' 
@@ -118,10 +118,10 @@ if __name__ == "__main__":
     # second argument: training mode
     modes=['finetune', 'pretrain', 'eval']
     # third argument: datasets
-    datasets=['pastis', 'cdds']
+    datasets=['pastis', 'bradd']
     # visual field sizes
     field_sizes=params.VIS_FIELDS
-    usage= 'Usage: $ python main.py ([att] ([finetune]|[eval] [pastis]|[cdds] [1|3|5]) | ([pretrain] [1|3|5])) | ([conv] ([finetune]|[eval] [pastis]|[cdds] [1|3|5|7]) | ([pretrain] [1|3|5|7]))'
+    usage= 'Usage: $ python main.py ([att] ([finetune]|[eval] [pastis]|[bradd] [1|3|5]) | ([pretrain] [1|3|5])) | ([conv] ([finetune]|[eval] [pastis]|[bradd] [1|3|5|7]) | ([pretrain] [1|3|5|7]))'
     # check user input: models
     if passed_args[0] not in models:
         print(usage)

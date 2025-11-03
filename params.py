@@ -341,6 +341,27 @@ P_CLASS_COLORS=[
     (1, 1, 1)
 ]
 
+####################################################################### FINE-TUNING: BRADD-S1TS DATASET ################################################################################################
+
+BRADD_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/BraDD-S1TS_zenodo/'
+
+BRADD_IMG_WIDTH=48 # length of square side of image
+BRADD_NUM_PIXELS=BRADD_IMG_WIDTH**2 # number of pixels per CDDS-image
+BRADD_MAX_SEQ_LEN=24
+
+# coordinates are not available, calculate random coordinates from range of Brazilian Amazon [(min lat, max lat),(min long, max lon)]
+BRADD_COORD_RANGE=[(-15, 5),(-75,-45)]
+
+# number of classes
+BRADD_NUM_OUTPUTS=2
+
+BRADD_TVERSKY_ALPHA=0.2 # penalization for false positives (FTL)
+BRADD_TVERSKY_BETA=0.8 # penalization for false negatives (FTL)
+BRADD_TVERSKY_GAMMA=2.0 # focus on rare classes (FTL)
+BRADD_LAMBDA_1=0.1 # FTL ratio in combined loss
+BRADD_LAMBDA_2=1-BRADD_LAMBDA_1 # cross-entropy ratio in combined loss
+BRADD_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
+
 ####################################################################### FINE-TUNING: CDDS DATASET ################################################################################################
 
 # Cameroon deforestation driver classification (original dataset)
