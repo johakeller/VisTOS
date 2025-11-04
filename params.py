@@ -344,8 +344,8 @@ BRADD_NUM_PIXELS=BRADD_IMG_WIDTH**2 # number of pixels per CDDS-image
 BRADD_MAX_SEQ_LEN=24
 BRADD_BATCH_SIZE=BRADD_IMG_WIDTH*16 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 BRADD_MAX_EPOCHS= 10 # number of fine-tuning epochs
-BRADD_MAX_LR=1e-4 # maximum lerning rate for PASTIS-R
-BRADD_WEIGHT_DECAY=0.01 # weight decay term for PASTIS-R 
+BRADD_MAX_LR=1e-4 # maximum lerning rate 
+BRADD_WEIGHT_DECAY=0.01 # weight decay term for 
 
 # coordinates are not available, calculate random coordinates from range of Brazilian Amazon [(min lat, max lat),(min long, max lon)]
 BRADD_COORD_RANGE=[(-15, 5),(-75,-45)]
@@ -359,10 +359,10 @@ _bradd_neg_weight=1/(1-0.1586)
 _bradd_weight_scale=2/(_bradd_pos_weight+_bradd_neg_weight)
 BRADD_WEIGHTS=torch.tensor([_bradd_pos_weight*_bradd_weight_scale, _bradd_neg_weight*_bradd_weight_scale])
 
-BRADD_TVERSKY_ALPHA=0.2 # penalization for false positives (FTL)
-BRADD_TVERSKY_BETA=0.8 # penalization for false negatives (FTL)
-BRADD_TVERSKY_GAMMA=2.0 # focus on rare classes (FTL)
-BRADD_LAMBDA_1=0.1 # FTL ratio in combined loss
+BRADD_TVERSKY_ALPHA=0.4 # penalization for false positives (FTL)
+BRADD_TVERSKY_BETA=0.6 # penalization for false negatives (FTL)
+BRADD_TVERSKY_GAMMA=1.5 # focus on rare classes (FTL)
+BRADD_LAMBDA_1=0.7 # FTL ratio in combined loss
 BRADD_LAMBDA_2=1-BRADD_LAMBDA_1 # cross-entropy ratio in combined loss
 BRADD_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
 
