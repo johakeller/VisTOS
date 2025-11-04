@@ -199,8 +199,9 @@ class BraDDDataset(IterableDataset):
 
         # update EO mask
         eo_mask[chan_idx[:,None],month_idx[None,:]]=0
-        # load region_label and multiply ones with class index
-        region_label=sample_data['label'].all(dim=0)
+        # load region_label (union over all time steps)
+        region_label=sample_data['label'].any(dim=0)
+
 
         # create matrix with coordinates for each pixel based on random center point
         coords=self.generate_rnd_coords()

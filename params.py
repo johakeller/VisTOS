@@ -365,6 +365,13 @@ BRADD_TVERSKY_GAMMA=1.5 # focus on rare classes (FTL)
 BRADD_LAMBDA_1=0.7 # FTL ratio in combined loss
 BRADD_LAMBDA_2=1-BRADD_LAMBDA_1 # cross-entropy ratio in combined loss
 BRADD_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
+BRADD_LABELS_INV={0:'No deforestation', 1:'Deforestation'}
+
+# to represent labels as RGB-colors
+BRADD_CLASS_COLORS=[
+    (0, 0, 0),
+    (1.0, 0.4980392156862745, 0.054901960784313725)
+]
 
 ####################################################################### FINE-TUNING: CDDS DATASET ################################################################################################
 
