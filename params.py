@@ -207,16 +207,6 @@ CHANNEL_GROUPS={
 FT_NUM_TRAIN_SAMPLES= None # length of the dataloader dataset in samples (pixels time series)
 FT_NUM_VAL_SAMPLES= None # length of the dataloader dataset in samples (pixels time series)
 FT_NUM_TEST_SAMPLES=None # length of the dataloader dataset in samples (pixels time series)
-if dataset_=='pastis':
-    FT_BATCH_SIZE=128*8 # PASTIS-R number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
-    FT_MAX_EPOCHS= 10 # number of fine-tuning epochs
-    FT_MAX_LR=1e-4 # maximum lerning rate for PASTIS-R
-    FT_WEIGHT_DECAY=0.01 # weight decay term for PASTIS-R 
-else:
-    FT_BATCH_SIZE=332*8 # mini-batch size for CDDS (6*332 for VF size 5)
-    FT_MAX_EPOCHS= 1 # number of fine-tuning epochs
-    FT_MAX_LR=1e-5 #  maximum learning rate for CDDS
-    FT_WEIGHT_DECAY=0.0001 # weight decay term for CDDS
 FT_WARMUP=5 # warmup epochs for cosine-annealing
 FT_MIN_LR= 1e-6 # minimum learning rate
 FT_PATIENCE=3 # patience parameter for early stopping
@@ -251,8 +241,12 @@ P_S1D_PATH=os.path.join(P_PATH,'DATA_S1D') # path to PASTIS-R Sentinel-1 Descend
 P_S2_PATH=os.path.join(P_PATH,'DATA_S2') # path to PASTIS-R Sentinel-2 data
 
 P_IMG_WIDTH=128 # width of a PASTIS-R image
-P_NUM_PIXELS=16384 # numbre of pixels per image (128^2)
+P_NUM_PIXELS=16384 # number of pixels per image (128^2)
 P_MAX_SEQ_LEN=12 #12 months maximum sequence length for PASTIS-R
+P_BATCH_SIZE=P_IMG_WIDTH*8 # PASTIS-R number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+P_MAX_EPOCHS= 10 # number of fine-tuning epochs
+P_MAX_LR=1e-4 # maximum lerning rate for PASTIS-R
+P_WEIGHT_DECAY=0.01 # weight decay term for PASTIS-R 
 
 # params for multi-class segmentation
 P_TVERSKY_ALPHA=0.6 # penalization for false positives (FTL)
@@ -315,7 +309,7 @@ _p_weights= {
     'Sorghum':1.224e-05,
     'Void label':0, # ignore this class with CE ignore index
 }
-P_WEIGHTS=np.array(list(_p_weights.values())) # to numpy array
+P_WEIGHTS=torch.tensor(list(_p_weights.values())) 
 P_DELTA=0.5 # weight dampen parameter
 # to represent labels as RGB-colors
 P_CLASS_COLORS=[
@@ -343,17 +337,27 @@ P_CLASS_COLORS=[
 
 ####################################################################### FINE-TUNING: BRADD-S1TS DATASET ################################################################################################
 
-BRADD_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/BraDD-S1TS_zenodo/'
+BRADD_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/BraDD-S1TS/'
 
 BRADD_IMG_WIDTH=48 # length of square side of image
 BRADD_NUM_PIXELS=BRADD_IMG_WIDTH**2 # number of pixels per CDDS-image
 BRADD_MAX_SEQ_LEN=24
+BRADD_BATCH_SIZE=BRADD_IMG_WIDTH*16 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+BRADD_MAX_EPOCHS= 10 # number of fine-tuning epochs
+BRADD_MAX_LR=1e-4 # maximum lerning rate for PASTIS-R
+BRADD_WEIGHT_DECAY=0.01 # weight decay term for PASTIS-R 
 
 # coordinates are not available, calculate random coordinates from range of Brazilian Amazon [(min lat, max lat),(min long, max lon)]
 BRADD_COORD_RANGE=[(-15, 5),(-75,-45)]
 
 # number of classes
 BRADD_NUM_OUTPUTS=2
+# class weights (15.86% imbalance pos. ratio)
+_bradd_pos_weight=1/0.1586
+_bradd_neg_weight=1/(1-0.1586)
+# sum to 2
+_bradd_weight_scale=2/(_bradd_pos_weight+_bradd_neg_weight)
+BRADD_WEIGHTS=torch.tensor([_bradd_pos_weight*_bradd_weight_scale, _bradd_neg_weight*_bradd_weight_scale])
 
 BRADD_TVERSKY_ALPHA=0.2 # penalization for false positives (FTL)
 BRADD_TVERSKY_BETA=0.8 # penalization for false negatives (FTL)

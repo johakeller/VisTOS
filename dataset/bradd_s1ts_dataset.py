@@ -27,7 +27,7 @@ class BraDDDataset(IterableDataset):
     def __init__(
         self, 
         split='train', 
-        batch_size=params.FT_BATCH_SIZE, 
+        batch_size=params.BRADD_BATCH_SIZE, 
         max_length=None, 
         shuffle=False, 
         seed=123

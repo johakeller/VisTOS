@@ -29,7 +29,7 @@ class PastisRDataset(IterableDataset):
     def __init__(
         self, 
         split='train', 
-        batch_size=params.FT_BATCH_SIZE, 
+        batch_size=params.P_BATCH_SIZE, 
         max_length=None, 
         shuffle=False, 
         seed=123

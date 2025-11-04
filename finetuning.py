@@ -48,13 +48,10 @@ class FineTuning:
         self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'BraDD-S1TS'
         self.logger = logging.getLogger('default')
         self.vis_field_size = vis_field_size
-        self.warmup_epochs = params.FT_WARMUP
-        self.epochs = params.FT_MAX_EPOCHS
-        self.max_learning_rate = params.FT_MAX_LR
-        self.min_learning_rate = params.FT_MIN_LR
         self.model_type = 'att'
-        self.class_weights = params.P_WEIGHTS
         self.image_path= ''
+        self.warmup_epochs = params.FT_WARMUP
+        self.min_learning_rate=params.FT_MIN_LR
 
     def init_finetuning(
         self, 
@@ -77,23 +74,10 @@ class FineTuning:
 
         # init logger
         self.logger = utils.init_logger(name=f'finetuning_{self.dataset}_{model_type}_vf{self.vis_field_size}')
-        
-        # print and log info
-        message = (
-            f'\rFine-tuning VisTOS {"VF size" if model_type == "att" else "CVF size"} {self.vis_field_size} on {self.dataset}, '
-            f'batch size {params.FT_BATCH_SIZE}, '
-            f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
-        )
-        print(message)
-        self.logger.info(message)
-
-        # batch size
-        batch_size = params.FT_BATCH_SIZE
         # set start epoch, start iteration, previous loss to 0
         epoch = 0
         iteration = 0
         loss = 0
-
         # set model type and image path
         self.model_type = model_type
         self.image_path = os.path.join(params.OUTPUT, f'{model_type}_{self.vis_field_size}_{self.dataset}_images')
@@ -112,27 +96,29 @@ class FineTuning:
             val_ds = pastis_r_dataset.PastisRDataset(split='validation', max_length=params.FT_NUM_VAL_SAMPLES, shuffle=True)
             # test dataset
             test_ds = pastis_r_dataset.PastisRDataset(split='test', max_length=params.FT_NUM_TEST_SAMPLES, shuffle=True)
-            # Focal Tversky loss for rare classes
-            loss_1 = TverskyLoss(
-                mode='multiclass',
-                classes=params.P_TVERSKY_CLASSES,
-                from_logits=True,
-                alpha=params.P_TVERSKY_ALPHA,
-                beta=params.P_TVERSKY_BETA,
-                gamma=params.P_TVERSKY_GAMMA,
-                eps=1e-4,
-            )
-            # init inverse-frequency class-weights for CE
-            self.class_weights = (torch.from_numpy(params.P_WEIGHTS).float().to(params.DEVICE))
-            # CE for foreground/background separation and stability
-            loss_2 = nn.CrossEntropyLoss(
-                label_smoothing=0.1,
-                # ignores class 'Void'
-                ignore_index=19,
-                reduction='mean',
-                # pass class weights
-                weight=self.class_weights**params.P_DELTA,
-            )
+            # training params
+            self.total_pixels = params.P_NUM_PIXELS
+            batch_size=params.P_BATCH_SIZE
+            self.epochs = params.P_MAX_EPOCHS
+            self.max_learning_rate = params.P_MAX_LR
+            weight_decay=params.P_WEIGHT_DECAY
+            vis_method=utils.visualize_prediction_pastis
+            self.label_list = list(range(19))
+            # FTL params
+            classes=params.P_TVERSKY_CLASSES
+            from_logits=True
+            alpha=params.P_TVERSKY_ALPHA
+            beta=params.P_TVERSKY_BETA
+            gamma=params.P_TVERSKY_GAMMA
+            eps=1e-4
+            mode='multiclass'
+            # CE params
+            ignore_index=19
+            label_smoothing=0.1
+            weight=(params.P_WEIGHTS.to(params.DEVICE))**params.P_DELTA
+            # combined loss params
+            lambda_1=params.P_LAMBDA_1
+            lambda_2=params.P_LAMBDA_2
 
         # BraDD-S1TS branch
         elif self.dataset == 'BraDD-S1TS':
@@ -148,36 +134,78 @@ class FineTuning:
             val_ds = bradd_s1ts_dataset.BraDDDataset(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
             # test dataset
             test_ds = bradd_s1ts_dataset.BraDDDataset(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
-            # Focal Tversky loss for rare classes 
-            loss_1 = TverskyLoss(
-                mode='multiclass',
-                from_logits=True,
-                alpha=params.BRADD_TVERSKY_ALPHA,
-                beta=params.BRADD_TVERSKY_BETA,
-                gamma=params.BRADD_TVERSKY_GAMMA,
-                eps=1e-4,
-            )
-            # CE for foreground/background separation and stability
-            loss_2 = nn.CrossEntropyLoss(label_smoothing=params.BRADD_CE_LABEL_SMOOTHING,reduction='mean')
+            # training params
+            self.total_pixels = params.BRADD_NUM_PIXELS
+            batch_size=params.BRADD_BATCH_SIZE
+            self.epochs = params.BRADD_MAX_EPOCHS
+            self.max_learning_rate = params.BRADD_MAX_LR
+            weight_decay=params.BRADD_WEIGHT_DECAY
+            vis_method=utils.visualize_prediction_bradd
+            self.label_list = [0,1]
+            # CE params
+            weight = params.BRADD_WEIGHTS.to(params.DEVICE)
+            label_smoothing=params.BRADD_CE_LABEL_SMOOTHING
+            # default
+            ignore_index=-100
+            # FTL params
+            classes=None
+            from_logits=True
+            alpha=params.BRADD_TVERSKY_ALPHA
+            beta=params.BRADD_TVERSKY_BETA
+            gamma=params.BRADD_TVERSKY_GAMMA
+            eps=1e-4
+            mode='multiclass'
+            # combined loss params
+            lambda_1=params.BRADD_LAMBDA_1
+            lambda_2=params.BRADD_LAMBDA_2
         
         # unknown dataset
         else:
             raise ValueError(f'Dataset {self.dataset} unknown.')
+        
+        # print and log info
+        message = (
+            f'\rFine-tuning VisTOS {"VF size" if model_type == "att" else "CVF size"} {self.vis_field_size} on {self.dataset}, '
+            f'batch size {batch_size}, '
+            f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
+        )
+        print(message)
+        self.logger.info(message)
+
+        # Focal Tversky loss for rare classes
+        loss_1 = TverskyLoss(
+            mode=mode,
+            classes=classes,
+            from_logits=from_logits,
+            alpha=alpha,
+            beta=beta,
+            gamma=gamma,
+            eps=eps,
+        )
+        # CE for foreground/background separation and stability
+        loss_2 = nn.CrossEntropyLoss(
+            weight=weight,
+            label_smoothing=label_smoothing, 
+            ignore_index=ignore_index, 
+            reduction='mean'
+        )
 
         # define optimizer
         optimizer = optim.AdamW(
             model.parameters(),
-            lr=params.FT_MAX_LR,
-            weight_decay=params.FT_WEIGHT_DECAY,
+            lr=self.max_learning_rate,
+            weight_decay=weight_decay,
             eps=1e-6,
         )
-
         # try loading a model from cache if available
         if checkpointing:
             model, optimizer, epoch, iteration, loss = self.load_checkpoint(
-                model, optimizer, epoch, iteration, loss
+                model, 
+                optimizer, 
+                epoch, 
+                iteration, 
+                loss
             )
-
         # dataloaders: training dataloader
         train_dl = DataLoader(
             train_ds,
@@ -199,7 +227,6 @@ class FineTuning:
             num_workers=params.FT_NUM_WORKERS,
             drop_last=True,
         )
-
         # start fine-tuning procedure if eval_mode is False
         if not eval_mode:
             # run fine-tuning, returns the fine-tuned model
@@ -213,11 +240,11 @@ class FineTuning:
                 start_epoch=epoch,
                 start_iteration=iteration,
                 start_loss=loss,
-                lambda_1=params.P_LAMBDA_1,
-                lambda_2=params.P_LAMBDA_2,
+                lambda_1=lambda_1,
+                lambda_2=lambda_2,
             )
         # test fine-tuned model (directly accessed with eval_mode)
-        results_dict = self.evaluate(model, test_dl)        
+        results_dict = self.evaluate(model, test_dl, vis_method=vis_method)        
         # log multi-class metrics dictionary content to ouput
         self.logger.info('Test metrics:')
         for metric, result in results_dict.items():
@@ -261,8 +288,8 @@ class FineTuning:
         self,
         loss_1,
         loss_2,
-        lambda_1 = params.CDDS_LAMBDA_1,
-        lambda_2 = params.CDDS_LAMBDA_2
+        lambda_1,
+        lambda_2
     ):
         '''
         Computes weighted compound loss of fine-tuning head:
@@ -394,7 +421,7 @@ class FineTuning:
         '''
         Computes various metrics given prediction logit tensors and label tensors and returns 
         them in a dictionary for further averaging. Also calls the AUC-ROC curve function from
-        module utils, which visualizes ROC-curves individually for PASTIS-R and CDDS.
+        module utils, which visualizes ROC-curves individually for PASTIS-R and BraDD-S1TS.
         '''
 
         # label to numpy
@@ -406,13 +433,10 @@ class FineTuning:
             label_np = label_np[void_mask]
             # delete column label 19 from raw predictions
             raw_pred = raw_pred[:, :-1]
-            # list of valid labels (exclude class 19 (void))
-            label_list = list(range(19))
-        # normal label list for CDDS
+        # normal label list 
         else:
             # mask nothing
             void_mask = np.ones(label_np.shape, dtype=bool)
-            label_list = list(range(params.CDDS_NUM_OUTPUTS))
 
         # remove possible NaNs
         raw_pred = torch.nan_to_num(raw_pred, nan=0.0, posinf=1000, neginf=-1000)
@@ -425,32 +449,31 @@ class FineTuning:
         # get values for ROC-AUC visualization
         if self.dataset == 'PASTIS-R':
             utils.roc_auc_curve_pastis(prob_pred, label_np, image_path=self.image_path)
-        # CDDS
         else:
-            utils.roc_auc_curve_cdds(prob_pred, label_np, image_path=self.image_path)
+            utils.roc_auc_curve_bradd(prob_pred, label_np, image_path=self.image_path)
 
         # metrics: average macro -> simple average for imbalanced datasets
         metrics = {
             'precision': precision_score(
-                label_np, prediction, labels=label_list, average='macro', zero_division=0
+                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
             ),
             'f1_score': f1_score(
-                label_np, prediction, labels=label_list, average='macro', zero_division=0
+                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
             ),
             'recall': recall_score(
-                label_np, prediction, labels=label_list, average='macro', zero_division=0
+                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
             ),
             'accuracy': accuracy_score(label_np, prediction),
             'iou': jaccard_score(
-                label_np, prediction, labels=label_list, average='macro', zero_division=0
+                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
             ),
             'roc_auc': roc_auc_score(
-                label_np, prob_pred, labels=label_list, average='macro', multi_class='ovo'
+                label_np, prob_pred, labels=self.label_list, average='macro', multi_class='ovo'
             ),
-            'confidence': self.class_confidence(label_np, prob_pred, labels=label_list),
+            'confidence': self.class_confidence(label_np, prob_pred, labels=self.label_list),
             # return confusion matrix as list
             'confusion_matrix': confusion_matrix(
-                label_np, prediction, labels=label_list
+                label_np, prediction, labels=self.label_list
             ).tolist(),
         }
         return metrics
@@ -532,7 +555,8 @@ class FineTuning:
 
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
-                    # don't count 0-loss batch in loss calculation   
+                    # don't count 0-loss batch in loss calculation  
+                    print(f'DEBUGGUNG: loss: {loss.item()}') 
                     if loss.item() !=0.0:
                         # update batch counter
                         num_batches += 1
@@ -624,6 +648,7 @@ class FineTuning:
         model, 
         test_dl, 
         vis=True,
+        vis_method=utils.visualize_prediction_pastis
     ):
         '''
         Evaluation (test phase) of the fine-tuned segmentation model on the test set with 
@@ -637,8 +662,6 @@ class FineTuning:
         buffer_labels, buffer_preds, buffer_eo_data = [], [], []
         # count pixels per image
         pixel_ctr = 0
-        # define number of pixel per image
-        total_pixels = (params.BRADD_NUM_PIXELS if self.dataset == 'BraDD-S1TS' else params.P_NUM_PIXELS)
         # metrics collection lists
         all_preds, all_labels = [], []
         # count images
@@ -666,7 +689,7 @@ class FineTuning:
             # visualize every full image prediction
             if vis:
                 # if number of pixels of an image reached
-                if pixel_ctr >= total_pixels:
+                if pixel_ctr >= self.total_pixels:
                     # if something in buffer
                     if len(buffer_labels) > 0:
                         # append current collection to buffer
@@ -679,30 +702,20 @@ class FineTuning:
                     eo_data = torch.cat(vis_eo_data, dim=0)
 
                     # replace buffer by remainder
-                    buffer_labels = [labels[total_pixels:]]
-                    buffer_preds = [preds[total_pixels:]]
-                    buffer_eo_data = [eo_data[total_pixels:]]
+                    buffer_labels = [labels[self.total_pixels:]]
+                    buffer_preds = [preds[self.total_pixels:]]
+                    buffer_eo_data = [eo_data[self.total_pixels:]]
                     # reset collection lists
                     vis_preds, vis_labels, vis_eo_data = [], [], []
 
-                    # visualize predictions: CDDS dataset
-                    if self.dataset == 'CDDS':
-                        utils.visualize_prediction_cdds(
-                            eo_data=eo_data[:total_pixels],
-                            preds=preds[:total_pixels],
-                            label=labels[:total_pixels],
-                            title=f'test_{image_ctr}',
-                            image_path=self.image_path,
-                        )
-                    # PASTIS-R dataset
-                    else:
-                        utils.visualize_prediction_pastis(
-                            eo_data=eo_data[:total_pixels],
-                            preds=preds[:total_pixels],
-                            label=labels[:total_pixels],
-                            title=f'test_{image_ctr}',
-                            image_path=self.image_path,
-                        )
+                    # visualize predictions
+                    vis_method(
+                        eo_data=eo_data[:self.total_pixels],
+                        preds=preds[:self.total_pixels],
+                        label=labels[:self.total_pixels],
+                        title=f'test_{image_ctr}',
+                        image_path=self.image_path,
+                    )
                     # raise image count
                     image_ctr += 1
                     # count pixels in buffer
