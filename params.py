@@ -12,12 +12,8 @@ import torch
 
 ####################################################################### GENERAL ################################################################################################
 
-# general vairables, define the rest in params
 # environment used: ['colab', 'cluster',''cluster_portia','local', 'hpc']
-environment_= 'cluster'
-# dataset used (only relevant for fine-tuning): ['cdds', 'pastis']
-dataset_='pastis'
-
+environment_= 'colab'
 # general paths
 OUTPUT = './output' # output folder
 # define cache directory
@@ -337,7 +333,22 @@ P_CLASS_COLORS=[
 
 ####################################################################### FINE-TUNING: BRADD-S1TS DATASET ################################################################################################
 
-BRADD_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/BraDD-S1TS/'
+# paths
+# paths Colab
+if environment_ == 'colab':
+    P_PATH='/content/BraDD-S1TS/'
+# paths Cluster: Hex, Hal
+elif environment_ == 'cluster':
+    P_PATH='/shared/datasets/BraDD-S1TS/'
+# Portia
+elif environment_ == 'cluster_portia':
+    P_PATH=os.path.expanduser('~/data/BraDD-S1TS/')
+# HPC
+elif environment_ =='hpc':
+    P_PATH='/scratch/johakeller/datasets/BraDD-S1TS/'
+# default: local path
+else:
+    BRADD_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/BraDD-S1TS/'
 
 BRADD_IMG_WIDTH=48 # length of square side of image
 BRADD_NUM_PIXELS=BRADD_IMG_WIDTH**2 # number of pixels per CDDS-image
@@ -353,11 +364,11 @@ BRADD_COORD_RANGE=[(-15, 5),(-75,-45)]
 # number of classes
 BRADD_NUM_OUTPUTS=2
 # class weights (15.86% imbalance pos. ratio)
-_bradd_pos_weight=1/0.1586
-_bradd_neg_weight=1/(1-0.1586)
+bradd_pos_weight_=1/0.1586
+bradd_neg_weight_=1/(1-0.1586)
 # sum to 2
-_bradd_weight_scale=2/(_bradd_pos_weight+_bradd_neg_weight)
-BRADD_WEIGHTS=torch.tensor([_bradd_pos_weight*_bradd_weight_scale, _bradd_neg_weight*_bradd_weight_scale])
+bradd_weight_scale_=2/(bradd_pos_weight_+bradd_neg_weight_)
+BRADD_WEIGHTS=torch.tensor([bradd_pos_weight_*bradd_weight_scale_, bradd_neg_weight_*bradd_weight_scale_])
 
 BRADD_TVERSKY_ALPHA=0.4 # penalization for false positives (FTL)
 BRADD_TVERSKY_BETA=0.6 # penalization for false negatives (FTL)
@@ -427,7 +438,7 @@ CDDS_LAMBDA_2=1-CDDS_LAMBDA_1 # cross-entropy ratio in combined loss
 CDDS_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
 
 # hardcoded merged label weights based on init_class_weights() in forestnet_dataset.py, normalized by 'No deforestation' weight
-_cdds_weights= {
+cdds_weights_= {
     'No deforestation': 7.932049558081326e-09,
     'Plantation': 2.163298771029968e-06,
     'Smallholder agriculture' : 5.017783023033631e-07,
@@ -435,10 +446,10 @@ _cdds_weights= {
     'Grassland shrubland': 1.2678288431061807e-05,
 }
 # exponent delta, to flatten cross-entropy class weights
-_delta_cdds_weights=0.5
-_norm_cdds_weights=_cdds_weights['No deforestation']**_delta_cdds_weights # apply delta to normalization factor
+delta_cdds_weights_=0.5
+norm_cdds_weights_=cdds_weights_['No deforestation']**delta_cdds_weights_ # apply delta to normalization factor
 
-CDDS_WEIGHTS=(np.array(list(_cdds_weights.values()))**_delta_cdds_weights)/_norm_cdds_weights # normalize weights
+CDDS_WEIGHTS=(np.array(list(cdds_weights_.values()))**delta_cdds_weights_)/norm_cdds_weights_ # normalize weights
 
 # colormap to display predicted labels in RGB
 CDDS_CLASS_COLORS=[
