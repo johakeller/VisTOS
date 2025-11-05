@@ -14,6 +14,7 @@ import sys
 import numpy as np
 import pandas as pd
 import torch
+import torchvision.transforms as transforms
 from torch.utils.data import IterableDataset
 
 import params
@@ -67,6 +68,14 @@ class BraDDDataset(IterableDataset):
             self.rand.shuffle(self.sample_indices)
         # get number of original pre-training input bands
         self.num_bands= sum(values['length'] for values in params.CHANNEL_GROUPS.values()) # exclude DW, include B9
+        # load stats
+        stats=torch.load(os.path.join(params.BRADD_PATH, 'close_stats.pt'), weights_only=False)
+        # normalization 
+        minimum=stats['min']
+        maximum=stats['max']
+        divide=maximum-minimum
+        # normalization: (x-min)/(max-min) -> [0,1]
+        self.normalize = transforms.Normalize(mean=[minimum,minimum], std=[divide,divide])
 
     def __len__(self):
         '''
@@ -193,8 +202,10 @@ class BraDDDataset(IterableDataset):
         chan_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S1']['idx']))
         # select correct mapping time steps
         month_idx= torch.as_tensor(month_mapping)
+        # normalization 
+        s1_data=self.normalize(sample_data["image"])
         # select the correct input images for the time steps
-        s1_selected=sample_data['image'][image_idx].permute(1,0,2,3)
+        s1_selected=s1_data[image_idx].permute(1,0,2,3)
         eo_tensor[chan_idx[:,None], month_idx[None,:]]=s1_selected
 
         # update EO mask
