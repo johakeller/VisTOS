@@ -13,7 +13,7 @@ import torch
 ####################################################################### GENERAL ################################################################################################
 
 # environment used: ['colab', 'cluster',''cluster_portia','local', 'hpc']
-environment_= 'local'
+environment_= 'colab'
 # general paths
 OUTPUT = './output' # output folder
 # define cache directory
@@ -336,16 +336,16 @@ P_CLASS_COLORS=[
 # paths
 # paths Colab
 if environment_ == 'colab':
-    P_PATH='/content/BraDD-S1TS/'
+    BRADD_PATH='/content/BraDD-S1TS/'
 # paths Cluster: Hex, Hal
 elif environment_ == 'cluster':
-    P_PATH='/shared/datasets/BraDD-S1TS/'
+    BRADD_PATH='/shared/datasets/BraDD-S1TS/'
 # Portia
 elif environment_ == 'cluster_portia':
-    P_PATH=os.path.expanduser('~/data/BraDD-S1TS/')
+    BRADD_PATH=os.path.expanduser('~/data/BraDD-S1TS/')
 # HPC
 elif environment_ =='hpc':
-    P_PATH='/scratch/johakeller/datasets/BraDD-S1TS/'
+    BRADD_PATH='/scratch/johakeller/datasets/BraDD-S1TS/'
 # default: local path
 else:
     BRADD_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/BraDD-S1TS/'
@@ -353,7 +353,7 @@ else:
 BRADD_IMG_WIDTH=48 # length of square side of image
 BRADD_NUM_PIXELS=BRADD_IMG_WIDTH**2 # number of pixels per CDDS-image
 BRADD_MAX_SEQ_LEN=24
-BRADD_BATCH_SIZE=BRADD_IMG_WIDTH*16 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+BRADD_BATCH_SIZE=13632 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 BRADD_MAX_EPOCHS= 10 # number of fine-tuning epochs
 BRADD_MAX_LR=1e-4 # maximum lerning rate 
 BRADD_WEIGHT_DECAY=0.01 # weight decay term for 

@@ -152,7 +152,7 @@ class BraDDDataset(IterableDataset):
             else:
                 image_idx_list.append(image_idx)
                 month_mapping_list.append(month_delta)
-        return image_idx_list, month_mapping_list, start_date.month
+        return image_idx_list, month_mapping_list, (start_date.month-1)
        
     @staticmethod
     def generate_rnd_coords(coord_range=params.BRADD_COORD_RANGE):
