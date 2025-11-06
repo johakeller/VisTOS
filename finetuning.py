@@ -552,11 +552,10 @@ class FineTuning:
                         lambda_1=lambda_1,
                         lambda_2=lambda_2
                     )
-
+                    print(f'DEBUGGUNG: loss: {loss.item()}') 
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
                     # don't count 0-loss batch in loss calculation  
-                    print(f'DEBUGGUNG: loss: {loss.item()}') 
                     if loss.item() !=0.0:
                         # update batch counter
                         num_batches += 1
@@ -578,7 +577,10 @@ class FineTuning:
                     )
 
             # append average train loss for epoch
-            train_loss.append(epoch_train_loss / num_batches)
+            if num_batches !=0:
+                train_loss.append(epoch_train_loss / num_batches)
+            else:
+                train_loss.append(0.0)
 
             # VALIDATION
             model.eval()
@@ -599,6 +601,7 @@ class FineTuning:
                         lambda_1=lambda_1,
                         lambda_2=lambda_2
                     )
+                    print(f'DEBUGGUNG: loss: {loss.item()}') 
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
                     # don't count 0-loss batch in loss calculation   
@@ -608,7 +611,10 @@ class FineTuning:
                     epoch_val_loss += loss.item()
 
             # append average val loss for epoch
-            val_loss.append(epoch_val_loss / num_batches)
+            if num_batches !=0:
+                val_loss.append(epoch_val_loss / num_batches)
+            else:
+                val_loss.append(0.0)
 
             # loss summary for training + validation epoch
             message = f'Training epoch {epoch + 1}: train loss: {train_loss[-1]:.4f}, validation loss: {val_loss[-1]:.4f}'

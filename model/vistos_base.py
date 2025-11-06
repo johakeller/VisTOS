@@ -79,10 +79,23 @@ class Attention(nn.Module):
             k=k.reshape(B_head,N,self.head_dim)
             v=v.reshape(B_head,N,self.head_dim)
             # if attention mask is available: reshape mask to (B,num_heads,N,N)
-            if attn_mask is not None:               
+            if attn_mask is not None:              
+                # completely masked samples produce NaNs -> 
                 attn_mask = attn_mask[:, None, None].repeat((1, self.num_heads, N, 1))
                 # GPU bug: B*num_heads expected (B, num_heads, N, N) -> (B*num_heads, N, N)
                 attn_mask=attn_mask.reshape(B_head,N,N)
+                # bug fix (VF 3) for issue: https://github.com/pytorch/pytorch/issues/103749
+                # mark rows in last dimension with everything masked
+                zero_rows = ~(attn_mask.any(dim=-1))
+                if zero_rows.any():
+                    # set the first element per zero row True
+                    attn_mask[zero_rows, 0] = True
+                else:
+                    attn_mask = attn_mask
+                # set 0-rows 0 again
+                if zero_rows.any():
+                    x[zero_rows] = 0.0
+
             # attention
             x = F.scaled_dot_product_attention(
                 q,

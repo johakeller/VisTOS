@@ -13,7 +13,7 @@ import torch
 ####################################################################### GENERAL ################################################################################################
 
 # environment used: ['colab', 'cluster',''cluster_portia','local', 'hpc']
-environment_= 'colab'
+environment_= 'local'
 # general paths
 OUTPUT = './output' # output folder
 # define cache directory
@@ -353,7 +353,7 @@ else:
 BRADD_IMG_WIDTH=48 # length of square side of image
 BRADD_NUM_PIXELS=BRADD_IMG_WIDTH**2 # number of pixels per CDDS-image
 BRADD_MAX_SEQ_LEN=24
-BRADD_BATCH_SIZE=13632 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+BRADD_BATCH_SIZE=48*16 #13632 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 BRADD_MAX_EPOCHS= 10 # number of fine-tuning epochs
 BRADD_MAX_LR=1e-4 # maximum lerning rate 
 BRADD_WEIGHT_DECAY=0.01 # weight decay term for 
