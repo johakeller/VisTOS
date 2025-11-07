@@ -686,12 +686,6 @@ class FineTuning:
             label = input_dict['EO_label'].long()
             # forward pass
             prediction = model(input_dict).float()
-            # append to visualisation list: predictions
-            vis_preds.append(prediction)
-            # labels
-            vis_labels.append(label)
-            # input Earth observation data
-            vis_eo_data.append(input_dict['EO'])
 
             # count pixels in buffer
             pixel_ctr += label.shape[0]
@@ -701,6 +695,12 @@ class FineTuning:
 
             # visualize every full image prediction
             if vis:
+                # append to visualisation list: predictions
+                vis_preds.append(prediction)
+                # labels
+                vis_labels.append(label)
+                # input Earth observation data
+                vis_eo_data.append(input_dict['EO'])
                 # if number of pixels of an image reached
                 if pixel_ctr >= self.total_pixels:
                     # if something in buffer
