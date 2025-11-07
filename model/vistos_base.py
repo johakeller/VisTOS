@@ -80,7 +80,6 @@ class Attention(nn.Module):
             v=v.reshape(B_head,N,self.head_dim)
             # if attention mask is available: reshape mask to (B,num_heads,N,N)
             if attn_mask is not None:              
-                # completely masked samples produce NaNs -> 
                 attn_mask = attn_mask[:, None, None].repeat((1, self.num_heads, N, 1))
                 # GPU bug: B*num_heads expected (B, num_heads, N, N) -> (B*num_heads, N, N)
                 attn_mask=attn_mask.reshape(B_head,N,N)

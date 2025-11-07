@@ -443,6 +443,15 @@ class FineTuning:
 
         # logit predictions to probabilities
         prob_pred = torch.softmax(raw_pred, dim=1).cpu().numpy()[void_mask]
+        # handle binary case for AUC-ROC
+        if prob_pred.shape[-1]==2:
+            roc_auc = roc_auc_score(label_np, prob_pred[:,-1])
+        # multiclass case
+        else:
+            roc_auc = roc_auc_score(
+                label_np, prob_pred, labels=self.label_list, average='macro', multi_class='ovo'
+            )
+
         # class predictions
         prediction = np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask]
 
@@ -467,9 +476,7 @@ class FineTuning:
             'iou': jaccard_score(
                 label_np, prediction, labels=self.label_list, average='macro', zero_division=0
             ),
-            'roc_auc': roc_auc_score(
-                label_np, prob_pred, labels=self.label_list, average='macro', multi_class='ovo'
-            ),
+            'roc_auc': roc_auc,
             'confidence': self.class_confidence(label_np, prob_pred, labels=self.label_list),
             # return confusion matrix as list
             'confusion_matrix': confusion_matrix(
