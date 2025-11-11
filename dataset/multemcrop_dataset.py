@@ -5,22 +5,20 @@ cross-entropy via main() method.
 
 Credits for base dataset: Debus et al., 2024, [https://zenodo.org/records/8325259]
 '''
-
-import math
 import os
 import random
 import sys
 
 import numpy as np
 import pandas as pd
+import rasterio
 import torch
-import torchvision.transforms as transforms
 from torch.utils.data import IterableDataset
 
 import params
 
 
-class BraDDDataset(IterableDataset):
+class MulTempCrop(IterableDataset):
     '''
     Dataset class for BraDD-S1TS dataset.
     '''
@@ -28,31 +26,54 @@ class BraDDDataset(IterableDataset):
     def __init__(
         self, 
         split='train', 
-        batch_size=params.BRADD_BATCH_SIZE, 
+        batch_size=params.MTC_BATCH_SIZE, 
         max_length=None, 
         shuffle=False, 
         seed=123
-    ):
-        data_path=os.path.join(params.BRADD_PATH, 'meta.csv')        
+    ):      
         self.seed = seed
         self.rand=random.Random(self.seed)
         self.batch_size=batch_size
-        # list of names of sample directories for split
-        try:
-            self.data_frame=pd.read_csv(data_path)
-        except FileNotFoundError as e:
-            print(f'File meta.csv must be in {params.BRADD_PATH}', e)
-            sys.exit(1)
+
         # split defines which part of the dataset to load
         if split=='train':
-            self.sample_paths=self.data_frame.loc[self.data_frame['close_set'].eq('train'), 'file'].tolist()
+            data_path= os.path.join(params.MTC_PATH, 'training_data.txt') 
+            self.samples_path=os.path.join(params.MTC_PATH, 'training_chips')
         elif split=='test':
-            self.sample_paths=self.data_frame.loc[self.data_frame['close_set'].eq('test'), 'file'].tolist()
+            data_path= os.path.join(params.MTC_PATH, 'test_data.txt') 
+            self.samples_path=os.path.join(params.MTC_PATH, 'test_chips')
         elif split=='validation':
-           self.sample_paths=self.data_frame.loc[self.data_frame['close_set'].eq('validation'), 'file'].tolist()
+           data_path= os.path.join(params.MTC_PATH, 'validation_data.txt') 
+           self.samples_path=os.path.join(params.MTC_PATH, 'validation_chips')
         else:
             raise NotImplementedError(f'Split {split} not implemented.')
-        max_num_samples=len(self.sample_paths)*params.BRADD_NUM_PIXELS
+        
+        # get split samples idx list
+        try:
+            with open(data_path, 'r', encoding='utf-8') as file:
+                self.sample_idx= [row.strip() for row in file]
+            if shuffle: 
+                self.rand.shuffle(self.sample_idx)
+
+        except FileNotFoundError as e:
+            if split == 'train':
+                print(f'File training_data.txt must be in {params.MTC_PATH}', e)
+            else:
+                print(f'File {split}_data.txt must be in {params.MTC_PATH}', e)
+            sys.exit(1)
+
+        # get corresponding metadata
+        chips_df_path= os.path.join(params.MTC_PATH, 'chips_df.csv') 
+        try:
+            chips_df=pd.read_csv(chips_df_path).set_index("chip_id", drop=False)
+            # metadata dictionary
+            self.meta=chips_df.to_dict(orient='index')
+        except FileNotFoundError as e:
+            if split == 'train':
+                print(f'File chips_df.csv must be in {params.MTC_PATH}', e)
+            sys.exit(1)
+
+        max_num_samples=len(self.sample_idx)*params.MTC_NUM_PIXELS
         # check if enough samples available for desired length (in pixels) of the dataset
         if (max_length is not None) and (max_length > max_num_samples):
             raise IndexError(f'Length {max_length} is exceeding actual number of samples: ({max_num_samples})')
@@ -60,22 +81,11 @@ class BraDDDataset(IterableDataset):
             # if parameter is set, limits the length of the dataset
             self.data_length=max_length if max_length is not None else max_num_samples
         # number of samples (images) used
-        self.num_samples=self.data_length//params.BRADD_NUM_PIXELS
+        self.num_samples=self.data_length//params.MTC_NUM_PIXELS
         # list of sample indices used
-        self.sample_indices=list(range(len(self.sample_paths)))[:self.num_samples+1] 
-        self.shuffle=shuffle
-        if self.shuffle: 
-            self.rand.shuffle(self.sample_indices)
+        self.sample_idx=self.sample_idx[:self.num_samples] 
         # get number of original pre-training input bands
         self.num_bands= sum(values['length'] for values in params.CHANNEL_GROUPS.values()) # exclude DW, include B9
-        # load stats
-        stats=torch.load(os.path.join(params.BRADD_PATH, 'close_stats.pt'), weights_only=False)
-        # normalization 
-        minimum=stats['min']
-        maximum=stats['max']
-        divide=maximum-minimum
-        # normalization: (x-min)/(max-min) -> [0,1]
-        self.normalize = transforms.Normalize(mean=[minimum,minimum], std=[divide,divide])
 
     def __len__(self):
         '''
@@ -91,20 +101,20 @@ class BraDDDataset(IterableDataset):
         and yields pixel time series as samples. Outputs the sample as a dictionary. 
         '''
         
-        for idx, sample_index in enumerate(self.sample_indices):
+        for idx, sample_id in enumerate(self.sample_idx):
 
             # create orig. sized array with 0s to represent missing bands, dimensions (num_orig_bands, 332, 332)
-            eo_style_array = torch.zeros([self.num_bands, params.BRADD_MAX_SEQ_LEN,params.BRADD_IMG_WIDTH, params.BRADD_IMG_WIDTH])
+            eo_style_array = torch.zeros([self.num_bands, params.MTC_MAX_SEQ_LEN,params.MTC_IMG_WIDTH, params.MTC_IMG_WIDTH])
             # indicate non-available channels with 1
             eo_style_mask = torch.ones_like(eo_style_array)
 
             # prepare and pad the output data: loads the images from the dataset into their positions in EO array                  
-            eo_style_array, eo_style_mask, eo_style_label, coords, start_month=self.prepare_channel_input(sample_index, eo_style_array, eo_style_mask)    
+            eo_style_array, eo_style_mask, eo_style_label, coords, start_month=self.prepare_channel_input(sample_id, eo_style_array, eo_style_mask)    
 
             # iterate over the pixels of the EO array and the corresponding mask and label
-            for pix_id in range(params.BRADD_NUM_PIXELS):
+            for pix_id in range(params.MTC_NUM_PIXELS):
                 # check if reached max number of samples in last sample
-                if idx == self.num_samples and pix_id >= (self.data_length%params.BRADD_NUM_PIXELS):
+                if idx == self.num_samples and pix_id >= (self.data_length%params.MTC_NUM_PIXELS):
                     break
                 # obtain pixel time series
                 eo_data_vf=eo_style_array[pix_id].float().to(params.DEVICE)
@@ -126,59 +136,33 @@ class BraDDDataset(IterableDataset):
                     dw_mask=dw_mask_vf
                 )  
     
-    @staticmethod
-    def calc_month_index(sample_data):
+    def get_month_idx(self, sample_id):
         '''
         Calculates the index of the month in the 24-months array of the interval 
         [01.year-1, 12.year], which is mapped on the indices in range [0,23].
         '''
-        # get list of months
-        dates_list= pd.to_datetime(sample_data['image_dates']).to_period('M')
-        # get start month
-        start_date= dates_list[0]
-        # month index in 24 items-array
-        month_delta_list= (dates_list.year-start_date.year)*12+(dates_list.month-start_date.month)
-        # only use one image per month (idx in image list, month idx [0-23])
-        image_idx_list=[0]
-        # month mapping indx ([0-23])
-        month_mapping_list=[0]
-        for image_idx, month_delta in zip(range(1, len(dates_list)), month_delta_list[1:]):
-            # check if last month is the same, keep only last index in list
-            if dates_list[image_idx]==dates_list[image_idx-1]:
-                # if the month is the same as the previous, take the last image index 
-                # and retain the month idx 
-                image_idx_list[-1] = image_idx
-            # if its a new month, append as (idx in image list, new month idx)
-            else:
-                image_idx_list.append(image_idx)
-                month_mapping_list.append(month_delta)
-        return image_idx_list, month_mapping_list, (start_date.month-1)
+        sample_meta=self.meta[sample_id]
+        # get start month index
+        start_month= (pd.to_datetime(sample_meta['first_img_date']).to_period('M')).month-1
+        # get middle month index
+        mid_month= (pd.to_datetime(sample_meta['middle_img_date']).to_period('M')).month-1
+        # get last month index
+        last_month= (pd.to_datetime(sample_meta['last_img_date']).to_period('M')).month-1
+
+        return [start_month, mid_month, last_month]
        
     @staticmethod
-    def generate_rnd_coords(coord_range=params.BRADD_COORD_RANGE):
+    def generate_rnd_coords():
         '''
         Fills a matrix size (BRADD_IMG_WIDTH, BRADD_IMG_WIDTH) with lat/lon coordinates,
         positioning the randomly generated coordinates from a passed range in the 
         center of the image.
         '''
-        # select random center point from range in Brazil
-        random_lat=random.uniform(coord_range[0][0], coord_range[0][1])
-        random_lon=random.uniform(coord_range[1][0], coord_range[1][1])
-        
-        coord_matrix = np.zeros((2, params.BRADD_IMG_WIDTH, params.BRADD_IMG_WIDTH), dtype=np.float32)
-        # center of image
-        center=params.BRADD_IMG_WIDTH//2
-        for y in range(params.BRADD_IMG_WIDTH):
-            for x in range(params.BRADD_IMG_WIDTH):
-                # get offset from center of image (15 m/ pixel) for latitude
-                coord_matrix[0, y, x]=((y-center)*15/111320) + random_lat
-                # longitude offset (15 m/ pixel)
-                coord_matrix[1,y,x]= ((x-center)*15/111320*math.cos(math.radians(random_lat)))+random_lon
-        return coord_matrix 
+        pass
     
     def prepare_channel_input(
             self, 
-            index, 
+            sample_id, 
             eo_tensor, 
             eo_mask
         ):
@@ -188,30 +172,69 @@ class BraDDDataset(IterableDataset):
         images in an EO array.
         '''
 
-        # get sample directory name
-        sample_id=self.sample_paths[index]
+        # EO data path
+        eo_path=os.path.join(self.samples_path, f'{sample_id}_merged.tif')
+        # load data
+        with rasterio.open(eo_path) as src:
+            eo_data=src.read()
+            eo_transform=src.transform
+            eo_crs=src.crs
+        # (t*c, h,w)
+        eo_data=torch.from_numpy(eo_data.astype(np.float32, copy=False))
+        # get into shape (c,t, h, w)
+        eo_data=eo_data.reshape(params.MTC_TIME_STEPS,params.MTC_NUMBER_CHANNELS,params.MTC_IMG_WIDTH, params.MTC_IMG_WIDTH)
+        eo_data=eo_data.permute(1,0,2,3)
+        print(f'DEBBUGGING: eo_data {eo_data.shape}')
 
-        # sample path
-        sample_path=os.path.join(params.BRADD_PATH, f'Samples/{sample_id}')
 
-        sample_data=torch.load(sample_path, weights_only=False)
+        # label data path
+        label_path=os.path.join(self.samples_path, f'{sample_id}.mask.tif')
+        # load label
+        with rasterio.open(label_path) as src:
+            label_data=src.read(1)
+        label_data=torch.from_numpy(label_data).long()
+        print(f'DEBBUGGING: label_data {label_data.shape}')
+
         # get month index -> possibly not same as Sentinel-2 (different coverage)
-        image_idx, month_mapping, start_month=self.calc_month_index(sample_data)
+        month_idx=self.get_month_idx(sample_id)
 
         # insert into EO-style tensor -> select the correct channel groups
-        chan_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S1']['idx']))
-        # select correct mapping time steps
-        month_idx= torch.as_tensor(month_mapping)
-        # normalization 
-        s1_data=self.normalize(sample_data["image"])
-        # select the correct input images for the time steps
-        s1_selected=s1_data[image_idx].permute(1,0,2,3)
-        eo_tensor[chan_idx[:,None], month_idx[None,:]]=s1_selected
-
+        # RGB
+        rgb_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S2_RGB']['idx']))
+        src_rgb_idx=params.MTC_CHANNEL_GROUPS['S2_RGB']
+        # fill in data
+        eo_tensor[rgb_idx[:,None], month_idx]=eo_data[src_rgb_idx]
         # update EO mask
-        eo_mask[chan_idx[:,None],month_idx[None,:]]=0
-        # load region_label (union over all time steps)
-        region_label=sample_data['label'].any(dim=0)
+        eo_mask[rgb_idx[:,None],month_idx]=0
+
+        # NIR
+        nir_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S2_NIR_20']['idx']))
+        src_nir_idx=params.MTC_CHANNEL_GROUPS['S2_NIR_20']
+        # fill in data
+        eo_tensor[nir_idx[:,None], month_idx]=eo_data[src_nir_idx]
+        # update EO mask
+        eo_mask[nir_idx[:,None],month_idx]=0
+
+        # SWIR
+        swir_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S2_SWIR']['idx']))
+        src_swir_idx=params.MTC_CHANNEL_GROUPS['S2_SWIR']
+        # fill in data
+        eo_tensor[swir_idx[:,None], month_idx]=eo_data[src_swir_idx]
+        # update EO mask
+        eo_mask[swir_idx[:,None],month_idx]=0
+
+        # NDVI from NIR and red ((NIR-red)/(nir+red))
+        ndvi_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['NDVI']['idx']))
+        red_band = eo_data[2]
+        nir_band= eo_data[3]
+        # avoid zero division
+        ndvi=torch.zeros_like(red_band, dtype=torch.float32)
+        denominator=nir_band+red_band
+        ndvi=torch.where(denominator !=0, (nir_band-red_band)/denominator, ndvi)
+        # fill in data
+        eo_tensor[ndvi_idx[:,None], month_idx]=ndvi
+        # update EO mask
+        eo_mask[ndvi_idx[:,None],month_idx]=0
 
 
         # create matrix with coordinates for each pixel based on random center point
@@ -257,4 +280,10 @@ class BraDDDataset(IterableDataset):
         return input_dict
 
 
+
+# test
+ds = MulTempCrop()
+it = iter(ds)
+sample = next(it)
+print(sample)
 

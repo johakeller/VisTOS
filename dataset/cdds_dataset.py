@@ -15,56 +15,45 @@ import sys
 import numpy as np
 import pandas as pd
 import torch
+import torchvision.transforms as transforms
 from torch.utils.data import IterableDataset
 
 import params
 
 
-class CDDSDataset(IterableDataset):
+class BraDDDataset(IterableDataset):
     '''
-    Dataset class for Cameroon Deforestation-Driver Segmentation (CDDS) dataset.
+    Dataset class for BraDD-S1TS dataset.
     '''
 
     def __init__(
         self, 
         split='train', 
-        batch_size=params.FT_BATCH_SIZE, 
+        batch_size=params.BRADD_BATCH_SIZE, 
         max_length=None, 
         shuffle=False, 
-        vis_field_size=params.VIS_FIELDS[0], 
-        labels='merged', 
         seed=123
     ):
-        # split defines which part of the dataset to load
-        if split=='train':
-            data_path=params.CDDS_TRAIN_PATH
-        elif split=='test':
-            data_path=params.CDDS_TEST_PATH
-        elif split=='validation':
-            data_path=params.CDDS_VAL_PATH
-        else:
-            raise NotImplementedError(f'Split {split} not implemented.')
-        
+        data_path=os.path.join(params.BRADD_PATH, 'meta.csv')        
         self.seed = seed
         self.rand=random.Random(self.seed)
         self.batch_size=batch_size
-        # length of visual field side
-        self.vis_field_size=vis_field_size
-        self.padding=vis_field_size//2
         # list of names of sample directories for split
         try:
             self.data_frame=pd.read_csv(data_path)
         except FileNotFoundError as e:
-            print(f'File {split}.csv must be in {params.CDDS_PATH}', e)
+            print(f'File meta.csv must be in {params.BRADD_PATH}', e)
             sys.exit(1)
-        self.sample_paths = self.data_frame['sample_path'].tolist()
-        # use merged labels 
-        self.label_type=labels
-        self.labels=self.data_frame['merged_label'].tolist() if labels=='merged' else self.data_frame['label'].tolist() 
-        self.lat=self.data_frame['latitude'].tolist()
-        self.long=self.data_frame['longitude'].tolist()
-        self.year=self.data_frame['year'].tolist()
-        max_num_samples=len(self.sample_paths)*params.CDDS_NUM_PIXELS
+        # split defines which part of the dataset to load
+        if split=='train':
+            self.sample_paths=self.data_frame.loc[self.data_frame['close_set'].eq('train'), 'file'].tolist()
+        elif split=='test':
+            self.sample_paths=self.data_frame.loc[self.data_frame['close_set'].eq('test'), 'file'].tolist()
+        elif split=='validation':
+           self.sample_paths=self.data_frame.loc[self.data_frame['close_set'].eq('validation'), 'file'].tolist()
+        else:
+            raise NotImplementedError(f'Split {split} not implemented.')
+        max_num_samples=len(self.sample_paths)*params.BRADD_NUM_PIXELS
         # check if enough samples available for desired length (in pixels) of the dataset
         if (max_length is not None) and (max_length > max_num_samples):
             raise IndexError(f'Length {max_length} is exceeding actual number of samples: ({max_num_samples})')
@@ -72,12 +61,23 @@ class CDDSDataset(IterableDataset):
             # if parameter is set, limits the length of the dataset
             self.data_length=max_length if max_length is not None else max_num_samples
         # number of samples (images) used
-        self.num_samples=self.data_length//params.CDDS_NUM_PIXELS
+        self.num_samples=self.data_length//params.BRADD_NUM_PIXELS
         # list of sample indices used
         self.sample_indices=list(range(len(self.sample_paths)))[:self.num_samples+1] 
         self.shuffle=shuffle
         if self.shuffle: 
             self.rand.shuffle(self.sample_indices)
+        # get number of original pre-training input bands
+        self.num_bands= sum(values['length'] for values in params.CHANNEL_GROUPS.values()) # exclude DW, include B9
+        # load stats
+        stats=torch.load(os.path.join(params.BRADD_PATH, 'close_stats.pt'), weights_only=False)
+        # normalization 
+        minimum=stats['min']
+        maximum=stats['max']
+        divide=maximum-minimum
+        # normalization: (x-min)/(max-min) -> [0,1]
+        self.normalize = transforms.Normalize(mean=[minimum,minimum], std=[divide,divide])
+
 
     def __len__(self):
         '''

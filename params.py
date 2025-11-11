@@ -13,7 +13,7 @@ import torch
 ####################################################################### GENERAL ################################################################################################
 
 # environment used: ['colab', 'cluster',''cluster_portia','local', 'hpc']
-environment_= 'colab'
+environment_= 'local'
 # general paths
 OUTPUT = './output' # output folder
 # define cache directory
@@ -331,55 +331,64 @@ P_CLASS_COLORS=[
     (1, 1, 1)
 ]
 
-####################################################################### FINE-TUNING: BRADD-S1TS DATASET ################################################################################################
+####################################################################### FINE-TUNING: MTC DATASET ################################################################################################
 
 # paths
 # paths Colab
 if environment_ == 'colab':
-    BRADD_PATH='/content/BraDD-S1TS/'
+    MTC_PATH='/content/multi-temporal-crop-classification/'
 # paths Cluster: Hex, Hal
 elif environment_ == 'cluster':
-    BRADD_PATH='/shared/datasets/BraDD-S1TS/'
+    MTC_PATH='/shared/datasets/multi-temporal-crop-classification/'
 # Portia
 elif environment_ == 'cluster_portia':
-    BRADD_PATH=os.path.expanduser('~/data/BraDD-S1TS/')
+    MTC_PATH=os.path.expanduser('~/multi-temporal-crop-classification/')
 # HPC
 elif environment_ =='hpc':
-    BRADD_PATH='/scratch/johakeller/datasets/BraDD-S1TS/'
+    MTC_PATH='/scratch/johakeller/datasets/multi-temporal-crop-classification/'
 # default: local path
 else:
-    BRADD_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/BraDD-S1TS/'
+    MTC_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/multi-temporal-crop-classification/'
 
-BRADD_IMG_WIDTH=48 # length of square side of image
-BRADD_NUM_PIXELS=BRADD_IMG_WIDTH**2 # number of pixels per CDDS-image
-BRADD_MAX_SEQ_LEN=24
-BRADD_BATCH_SIZE=2304 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
-BRADD_MAX_EPOCHS= 10 # number of fine-tuning epochs
-BRADD_MAX_LR=1e-4 # maximum lerning rate 
-BRADD_WEIGHT_DECAY=0.01 # weight decay term for 
+MTC_IMG_WIDTH=224 # length of square side of image
+MTC_NUM_PIXELS=MTC_IMG_WIDTH**2 # number of pixels per CDDS-image
+MTC_MAX_SEQ_LEN=12
+MTC_TIME_STEPS=3
+MTC_NUMBER_CHANNELS=6
+MTC_BATCH_SIZE=2304 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+MTC_MAX_EPOCHS= 10 # number of fine-tuning epochs
+MTC_MAX_LR=1e-4 # maximum lerning rate 
+MTC_WEIGHT_DECAY=0.01 # weight decay term for 
 
 # coordinates are not available, calculate random coordinates from range of Brazilian Amazon [(min lat, max lat),(min long, max lon)]
-BRADD_COORD_RANGE=[(-15, 5),(-75,-45)]
+MTC_COORD_RANGE=[(-15, 5),(-75,-45)]
 
 # number of classes
-BRADD_NUM_OUTPUTS=2
+MTC_NUM_OUTPUTS=14
 # class weights (15.86% imbalance pos. ratio)
-bradd_pos_weight_=1/0.1586
-bradd_neg_weight_=1/(1-0.1586)
+mtc_pos_weight_=1/0.1586
+mtc_neg_weight_=1/(1-0.1586)
 # sum to 2
-bradd_weight_scale_=2/(bradd_pos_weight_+bradd_neg_weight_)
-BRADD_WEIGHTS=torch.tensor([bradd_pos_weight_*bradd_weight_scale_, bradd_neg_weight_*bradd_weight_scale_])
+mtc_weight_scale_=2/(mtc_pos_weight_+mtc_neg_weight_)
+MTC_WEIGHTS=torch.tensor([mtc_pos_weight_*mtc_weight_scale_, mtc_neg_weight_*mtc_weight_scale_])
 
-BRADD_TVERSKY_ALPHA=0.4 # penalization for false positives (FTL)
-BRADD_TVERSKY_BETA=0.6 # penalization for false negatives (FTL)
-BRADD_TVERSKY_GAMMA=1.5 # focus on rare classes (FTL)
-BRADD_LAMBDA_1=0.7 # FTL ratio in combined loss
-BRADD_LAMBDA_2=1-BRADD_LAMBDA_1 # cross-entropy ratio in combined loss
-BRADD_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
-BRADD_LABELS_INV={0:'No deforestation', 1:'Deforestation'}
+MTC_TVERSKY_ALPHA=0.4 # penalization for false positives (FTL)
+MTC_TVERSKY_BETA=0.6 # penalization for false negatives (FTL)
+MTC_TVERSKY_GAMMA=1.5 # focus on rare classes (FTL)
+MTC_LAMBDA_1=0.7 # FTL ratio in combined loss
+MTC_LAMBDA_2=1-MTC_LAMBDA_1 # cross-entropy ratio in combined loss
+MTC_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
+MTC_LABELS_INV={0:'No deforestation', 1:'Deforestation'}
+
+MTC_CHANNEL_GROUPS={
+    'S2_RGB':[0,1,2],
+    'S2_NIR_20':[3],
+    'S2_SWIR':[4,5]
+}
+
 
 # to represent labels as RGB-colors
-BRADD_CLASS_COLORS=[
+MTC_CLASS_COLORS=[
     (0, 0, 0),
     (1.0, 0.4980392156862745, 0.054901960784313725)
 ]
