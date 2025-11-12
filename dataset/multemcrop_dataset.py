@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 import rasterio
 import torch
+from rasterio import transform as rtx
+from rasterio import warp as rwarp
 from torch.utils.data import IterableDataset
 
 import params
@@ -152,13 +154,25 @@ class MulTempCrop(IterableDataset):
         return [start_month, mid_month, last_month]
        
     @staticmethod
-    def generate_rnd_coords():
+    def generate_coords(transform, src_crs, dst_crs=params.LATLON_CRS):
         '''
         Fills a matrix size (BRADD_IMG_WIDTH, BRADD_IMG_WIDTH) with lat/lon coordinates,
         positioning the randomly generated coordinates from a passed range in the 
         center of the image.
         '''
-        pass
+        width=params.MTC_IMG_WIDTH
+        height=params.MTC_IMG_WIDTH
+        # get rows and column matrices
+        rows, cols=np.meshgrid(np.arange(height), np.arange(width), indexing="ij")
+        # get coordinates from affine transform
+        x, y=rtx.xy(transform, rows, cols, offset="center")
+        x, y = np.asarray(x), np.asarray(y)
+        # convert to lat/lon
+        lon, lat=rwarp.transform(src_crs=src_crs, dst_crs=dst_crs, xs=x.ravel(), ys=y.ravel())
+        lat=np.asarray(lat).reshape(height,width)
+        lon=np.asarray(lon).reshape(height, width)
+        # get lat, lon pairs into on matrix
+        return np.stack([lat, lon], axis=0).astype(np.float32)
     
     def prepare_channel_input(
             self, 
@@ -197,6 +211,7 @@ class MulTempCrop(IterableDataset):
 
         # get month index -> possibly not same as Sentinel-2 (different coverage)
         month_idx=self.get_month_idx(sample_id)
+        start_month=month_idx[0]
 
         # insert into EO-style tensor -> select the correct channel groups
         # RGB
@@ -238,7 +253,7 @@ class MulTempCrop(IterableDataset):
 
 
         # create matrix with coordinates for each pixel based on random center point
-        coords=self.generate_rnd_coords()
+        coords=self.generate_coords(eo_transform, eo_crs)
 
         # mask values (are ignored anyway)
         eo_tensor=eo_tensor.masked_fill(eo_mask.to(dtype=torch.bool),0) 
@@ -248,7 +263,7 @@ class MulTempCrop(IterableDataset):
         eo_tensor=eo_tensor.reshape(c,t,h*w).permute(2,1,0)
         eo_mask=eo_mask.reshape(c,t,h*w).permute(2,1,0)
         # (h,w)-> (h*w)
-        region_label=region_label.reshape(h*w)
+        region_label=label_data.reshape(h*w)
         #(2,h,w)->(h*w,2)
         coords=coords.reshape(2,h*w).transpose(1,0)
             

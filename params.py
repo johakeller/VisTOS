@@ -31,6 +31,8 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 VIS_FIELDS=[1,3,5,7]
 # training modes
 MODES=('pretrain', 'finetune', 'eval')
+# lat lon crs
+LATLON_CRS='EPSG:4326'
 
 ####################################################################### PRE-TRAINING DATASET ################################################################################################
 
