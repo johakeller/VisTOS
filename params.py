@@ -367,20 +367,13 @@ MTC_COORD_RANGE=[(-15, 5),(-75,-45)]
 
 # number of classes
 MTC_NUM_OUTPUTS=14
-# class weights (15.86% imbalance pos. ratio)
-mtc_pos_weight_=1/0.1586
-mtc_neg_weight_=1/(1-0.1586)
-# sum to 2
-mtc_weight_scale_=2/(mtc_pos_weight_+mtc_neg_weight_)
-MTC_WEIGHTS=torch.tensor([mtc_pos_weight_*mtc_weight_scale_, mtc_neg_weight_*mtc_weight_scale_])
 
-MTC_TVERSKY_ALPHA=0.4 # penalization for false positives (FTL)
-MTC_TVERSKY_BETA=0.6 # penalization for false negatives (FTL)
-MTC_TVERSKY_GAMMA=1.5 # focus on rare classes (FTL)
+MTC_TVERSKY_ALPHA=0.3 # penalization for false positives (FTL)
+MTC_TVERSKY_BETA=0.7 # penalization for false negatives (FTL)
+MTC_TVERSKY_GAMMA=1.33 # focus on rare classes (FTL)
 MTC_LAMBDA_1=0.7 # FTL ratio in combined loss
 MTC_LAMBDA_2=1-MTC_LAMBDA_1 # cross-entropy ratio in combined loss
 MTC_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
-MTC_LABELS_INV={0:'No deforestation', 1:'Deforestation'}
 
 MTC_CHANNEL_GROUPS={
     'S2_RGB':[0,1,2],
