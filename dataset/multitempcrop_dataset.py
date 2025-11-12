@@ -20,7 +20,7 @@ from torch.utils.data import IterableDataset
 import params
 
 
-class MulTempCrop(IterableDataset):
+class MultiTempCrop(IterableDataset):
     '''
     Dataset class for BraDD-S1TS dataset.
     '''
@@ -195,11 +195,11 @@ class MulTempCrop(IterableDataset):
             eo_crs=src.crs
         # (t*c, h,w)
         eo_data=torch.from_numpy(eo_data.astype(np.float32, copy=False))
+        # normalize to range [0,1]
+        eo_data=eo_data*params.MTC_NORM
         # get into shape (c,t, h, w)
         eo_data=eo_data.reshape(params.MTC_TIME_STEPS,params.MTC_NUMBER_CHANNELS,params.MTC_IMG_WIDTH, params.MTC_IMG_WIDTH)
         eo_data=eo_data.permute(1,0,2,3)
-        print(f'DEBBUGGING: eo_data {eo_data.shape}')
-
 
         # label data path
         label_path=os.path.join(self.samples_path, f'{sample_id}.mask.tif')
@@ -207,7 +207,6 @@ class MulTempCrop(IterableDataset):
         with rasterio.open(label_path) as src:
             label_data=src.read(1)
         label_data=torch.from_numpy(label_data).long()
-        print(f'DEBBUGGING: label_data {label_data.shape}')
 
         # get month index -> possibly not same as Sentinel-2 (different coverage)
         month_idx=self.get_month_idx(sample_id)
@@ -297,8 +296,8 @@ class MulTempCrop(IterableDataset):
 
 
 # test
-ds = MulTempCrop()
-it = iter(ds)
-sample = next(it)
-print(sample)
+#ds = MulTempCrop()
+#it = iter(ds)
+#sample = next(it)
+
 

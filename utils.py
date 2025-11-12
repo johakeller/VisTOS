@@ -252,31 +252,30 @@ def visualize_prediction_pastis(
     plt.savefig(out_path, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
-# TODO
-def visualize_prediction_bradd(
+def visualize_prediction_mtc(
     eo_data: torch.Tensor, 
     preds:torch.Tensor, 
     label:torch.Tensor, 
     title: str, 
-    timestep: int =-1, 
+    timestep: int =0, 
     image_path: str =params.OUTPUT,
     ):
     '''
-    Visualizes model predictions on the PASTIS-R dataset as an image and saves the result. 
-    Plots an output in the form: VV-band from Sentinel-1 (for passed time step), RGB-image 
-    from Sentinel-2 (for passed time step), label map, model prediction from Sentinel-2. 
+    Visualizes model predictions on the MTC dataset as an image and saves the result. 
+    Plots an output in the form: RGB-image from Sentinel-2 (for passed time step), 
+    NDVI-band from Sentinel-1 (for passed time step), label map, model prediction. 
     '''
 
     # encode predicted class as integer
     pred_classes = torch.argmax(preds, dim=1)
     
     # slice the image from flattened pixel array
-    _, time_steps, num_chan=eo_data.shape
+    num_chan=eo_data.shape[-1]
     # reshape to 2D
-    img_width=params.BRADD_IMG_WIDTH
+    img_width=params.MTC_IMG_WIDTH
     label_img=label.reshape(img_width,img_width)
     pred_img=pred_classes.reshape(img_width,img_width)
-    eo_img=eo_data.reshape(img_width,img_width,time_steps, num_chan)
+    eo_img=eo_data[:,timestep].reshape(img_width,img_width, num_chan)
 
     # to numpy array
     pred_img=pred_img.detach().cpu().numpy() 
@@ -285,30 +284,28 @@ def visualize_prediction_bradd(
     
     _, axs =plt.subplots(1,4, figsize=(15,5))
 
-    # SAR, VV polarization first image
-    eo_sar=eo_img[:,:,0,0]
-    axs[0].imshow(eo_sar, cmap='magma')
-    axs[0].set_title('SAR VV (ts 0)')
+    # RGB
+    eo_rgb = eo_img[:,:,[4,2,3]]
+    # show rgb image
+    axs[0].imshow(eo_rgb)
+    axs[0].set_title('RGB')
     axs[0].axis('off')
 
-    # SAR, VV polarization last image
-    for i in range(num_chan):
-        if eo_img[:,:,i,0].sum() !=0:
-            eo_sar=eo_img[:,:,i,0]
-            axs[1].imshow(eo_sar, cmap='magma')
-            axs[1].set_title(f'SAR VV (ts {i})')
-            axs[1].axis('off')
-        else:
-            break
+    # NDVI
+    eo_sar=eo_img[:,:,16]
+    axs[1].imshow(eo_sar, cmap='RdYlGn')
+    axs[1].set_title('NDVI')
+    axs[1].axis('off')
 
     # label
-    label_cmap=ListedColormap(params.BRADD_CLASS_COLORS)
-    axs[2].imshow(label_img, cmap=label_cmap, vmin=0, vmax=1)
+    label_cmap=ListedColormap(params.MTC_CLASS_COLORS)
+    # multi-class
+    axs[2].imshow(label_img, cmap=label_cmap, vmin=0, vmax=13, interpolation='nearest')
     axs[2].set_title('Label')
     axs[2].axis('off')
 
     # prediction
-    axs[3].imshow(pred_img, cmap=label_cmap, vmin=0, vmax=1)
+    axs[3].imshow(pred_img, cmap=label_cmap, vmin=0, vmax=13, interpolation='nearest')
     axs[3].set_title('Prediction')
     axs[3].axis('off')
 
@@ -319,17 +316,22 @@ def visualize_prediction_bradd(
     plt.savefig(out_path, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
-def roc_auc_curve_bradd(prediction: NDArray[Any], label: NDArray[Any], image_path: str =params.OUTPUT,):
+def roc_auc_curve_mtc(prediction: NDArray[Any], label: NDArray[Any], image_path: str =params.OUTPUT,):
     '''
-    Plots multi-class AUC-ROC curves (for each class individually) for BraDD-S1TS 
+    Plots multi-class AUC-ROC curves (for each class individually) for MTC 
     dataset for raw predictions and labels in shape (batch size, number of 
     channels) and saves it to passed directory path.
     '''
 
     fig, ax = plt.subplots(figsize=(6, 6))
+    # only plot three rare and three frequent classes: 
+    # (Natural Vegetation=1, Corn=3, Soybeans=4, Cotton=11, Open Water=7, Sorghum=12)
+    classes_display=[1,3,4,11,7,12]
+    # Get corresponding colors
+    label_colors=[params.MTC_CLASS_COLORS[class_id] for class_id in classes_display] 
 
     # iterate through classes and class-colors
-    for class_id, color in zip(range(2), params.BRADD_CLASS_COLORS):
+    for class_id, color in zip(classes_display, label_colors):
         # get label for class
         label_class = (label==class_id).astype(int)
         # prediction for class
@@ -337,11 +339,11 @@ def roc_auc_curve_bradd(prediction: NDArray[Any], label: NDArray[Any], image_pat
         RocCurveDisplay.from_predictions(
             label_class, 
             predicted_class,
-            name=params.BRADD_LABELS_INV[class_id],
+            name=params.MTC_LABELS_INV[class_id],
             color=color,
             ax=ax,
             # chance level at last
-            plot_chance_level=(class_id == 1),
+            plot_chance_level=(class_id==classes_display[-1]),
         )
     ax.set_xlabel('False positive rate', fontsize=14)
     ax.set_ylabel('True positive rate',fontsize=14)
@@ -353,7 +355,7 @@ def roc_auc_curve_bradd(prediction: NDArray[Any], label: NDArray[Any], image_pat
     # save figure
     if not os.path.exists(image_path):
         os.makedirs(image_path)
-    out_path=os.path.join(image_path, 'BRADD_ROC_AUC.png')
+    out_path=os.path.join(image_path, 'MTC_ROC_AUC.png')
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
 

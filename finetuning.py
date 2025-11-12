@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 import params
 import utils
-from dataset import bradd_s1ts_dataset, pastis_r_dataset
+from dataset import multitempcrop_dataset, pastis_r_dataset
 
 # set scaler for mixed precision training 
 scaler = torch.GradScaler(enabled=torch.cuda.is_available())
@@ -45,7 +45,7 @@ class FineTuning:
     '''
 
     def __init__(self, vis_field_size, dataset):
-        self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'BraDD-S1TS'
+        self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'MTC'
         self.logger = logging.getLogger('default')
         self.vis_field_size = vis_field_size
         self.model_type = 'att'
@@ -120,44 +120,44 @@ class FineTuning:
             lambda_1=params.P_LAMBDA_1
             lambda_2=params.P_LAMBDA_2
 
-        # BraDD-S1TS branch
-        elif self.dataset == 'BraDD-S1TS':
+        # MTC branch
+        elif self.dataset == 'MTC':
             # construct the fine-tunig model from the pretrained model
             model = pretrained_model.construct_finetuning_model(
-                num_outputs=params.BRADD_NUM_OUTPUTS,
+                num_outputs=params.MTC_NUM_OUTPUTS,
                 vis_field_size=self.vis_field_size,
-                img_width=params.BRADD_IMG_WIDTH,
+                img_width=params.MTC_IMG_WIDTH,
             ).to(params.DEVICE)
             # training dataset
-            train_ds = bradd_s1ts_dataset.BraDDDataset(split='train',max_length=params.FT_NUM_TRAIN_SAMPLES,shuffle=True)
+            train_ds = multitempcrop_dataset.MultiTempCrop(split='train',max_length=params.FT_NUM_TRAIN_SAMPLES,shuffle=True)
             # validation dataset
-            val_ds = bradd_s1ts_dataset.BraDDDataset(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
+            val_ds = multitempcrop_dataset.MultiTempCrop(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
             # test dataset
-            test_ds = bradd_s1ts_dataset.BraDDDataset(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
+            test_ds = multitempcrop_dataset.MultiTempCrop(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
             # training params
-            self.total_pixels = params.BRADD_NUM_PIXELS
-            batch_size=params.BRADD_BATCH_SIZE
-            self.epochs = params.BRADD_MAX_EPOCHS
-            self.max_learning_rate = params.BRADD_MAX_LR
-            weight_decay=params.BRADD_WEIGHT_DECAY
-            vis_method=utils.visualize_prediction_bradd
-            self.label_list = [0,1]
+            self.total_pixels = params.MTC_NUM_PIXELS
+            batch_size=params.MTC_BATCH_SIZE
+            self.epochs = params.MTC_MAX_EPOCHS
+            self.max_learning_rate = params.MTC_MAX_LR
+            weight_decay=params.MTC_WEIGHT_DECAY
+            vis_method=utils.visualize_prediction_mtc
+            self.label_list = params.MTC_CLASSES
             # CE params
-            weight = params.BRADD_WEIGHTS.to(params.DEVICE)
-            label_smoothing=params.BRADD_CE_LABEL_SMOOTHING
+            weight = params.MTC_WEIGHTS.to(params.DEVICE)
+            label_smoothing=params.MTC_CE_LABEL_SMOOTHING
             # default
-            ignore_index=-100
+            ignore_index=0
             # FTL params
-            classes=None
+            classes=params.MTC_CLASSES
             from_logits=True
-            alpha=params.BRADD_TVERSKY_ALPHA
-            beta=params.BRADD_TVERSKY_BETA
-            gamma=params.BRADD_TVERSKY_GAMMA
+            alpha=params.MTC_TVERSKY_ALPHA
+            beta=params.MTC_TVERSKY_BETA
+            gamma=params.MTC_TVERSKY_GAMMA
             eps=1e-4
             mode='multiclass'
             # combined loss params
-            lambda_1=params.BRADD_LAMBDA_1
-            lambda_2=params.BRADD_LAMBDA_2
+            lambda_1=params.MTC_LAMBDA_1
+            lambda_2=params.MTC_LAMBDA_2
         
         # unknown dataset
         else:
@@ -433,25 +433,19 @@ class FineTuning:
             label_np = label_np[void_mask]
             # delete column label 19 from raw predictions
             raw_pred = raw_pred[:, :-1]
-        # normal label list 
+        # ignore 'No Data' label in MTC
         else:
-            # mask nothing
-            void_mask = np.ones(label_np.shape, dtype=bool)
+            # mask class 19 instances
+            void_mask = label_np != 0
+            label_np = label_np[void_mask]
+            # delete column label 19 from raw predictions
+            raw_pred = raw_pred[:,1 :]
 
         # remove possible NaNs
         raw_pred = torch.nan_to_num(raw_pred, nan=0.0, posinf=1000, neginf=-1000)
 
         # logit predictions to probabilities
         prob_pred = torch.softmax(raw_pred, dim=1).cpu().numpy()[void_mask]
-        # handle binary case for AUC-ROC
-        if prob_pred.shape[-1]==2:
-            roc_auc = roc_auc_score(label_np, prob_pred[:,-1])
-        # multiclass case
-        else:
-            roc_auc = roc_auc_score(
-                label_np, prob_pred, labels=self.label_list, average='macro', multi_class='ovo'
-            )
-
         # class predictions
         prediction = np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask]
 
@@ -459,7 +453,7 @@ class FineTuning:
         if self.dataset == 'PASTIS-R':
             utils.roc_auc_curve_pastis(prob_pred, label_np, image_path=self.image_path)
         else:
-            utils.roc_auc_curve_bradd(prob_pred, label_np, image_path=self.image_path)
+            utils.roc_auc_curve_mtc(prob_pred, label_np, image_path=self.image_path)
 
         # metrics: average macro -> simple average for imbalanced datasets
         metrics = {
@@ -476,7 +470,9 @@ class FineTuning:
             'iou': jaccard_score(
                 label_np, prediction, labels=self.label_list, average='macro', zero_division=0
             ),
-            'roc_auc': roc_auc,
+            'roc_auc':roc_auc_score(
+                label_np, prob_pred, labels=self.label_list, average='macro', multi_class='ovo'
+            ),
             'confidence': self.class_confidence(label_np, prob_pred, labels=self.label_list),
             # return confusion matrix as list
             'confusion_matrix': confusion_matrix(
@@ -559,7 +555,7 @@ class FineTuning:
                         lambda_1=lambda_1,
                         lambda_2=lambda_2
                     )
-                    print(f'DEBUGGUNG: loss: {loss.item()}') 
+                    print(f'DEBUGGUNG: loss: {loss.item():.3f}') 
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
                     # don't count 0-loss batch in loss calculation  

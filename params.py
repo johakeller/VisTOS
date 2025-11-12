@@ -285,7 +285,7 @@ P_LABELS_INV={
 P_NUM_OUTPUTS=len(P_LABELS) # number of classes
 
 # inverse frequency weights
-_p_weights= {
+p_weights_= {
     'Background':1.050e-07,
     'Meadow': 2.306e-07,
     'Soft winter wheat': 6.279e-07,
@@ -307,7 +307,7 @@ _p_weights= {
     'Sorghum':1.224e-05,
     'Void label':0, # ignore this class with CE ignore index
 }
-P_WEIGHTS=torch.tensor(list(_p_weights.values())) 
+P_WEIGHTS=torch.tensor(list(p_weights_.values())) 
 P_DELTA=0.5 # weight dampen parameter
 # to represent labels as RGB-colors
 P_CLASS_COLORS=[
@@ -357,7 +357,7 @@ MTC_NUM_PIXELS=MTC_IMG_WIDTH**2 # number of pixels per CDDS-image
 MTC_MAX_SEQ_LEN=12
 MTC_TIME_STEPS=3
 MTC_NUMBER_CHANNELS=6
-MTC_BATCH_SIZE=2304 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+MTC_BATCH_SIZE=7168 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 MTC_MAX_EPOCHS= 10 # number of fine-tuning epochs
 MTC_MAX_LR=1e-4 # maximum lerning rate 
 MTC_WEIGHT_DECAY=0.01 # weight decay term for 
@@ -387,12 +387,70 @@ MTC_CHANNEL_GROUPS={
     'S2_NIR_20':[3],
     'S2_SWIR':[4,5]
 }
+# normalization factor
+MTC_NORM=1.0/10000.0
 
+MTC_LABELS={
+    'No Data':0,
+    'Natural Vegetation': 1,
+    'Forest': 2,
+    'Corn' : 3,
+    'Soybeans' : 4,
+    'Wetlands': 5, 
+    'Developed/Barren': 6,
+    'Open Water':7,
+    'Winter Wheat':8,
+    'Alfalfa':9,
+    'Fallow/Idle Cropland': 10,
+    'Cotton':11,
+    'Sorghum':12,
+    'Other':13 
+}
+# to address label name via value
+MTC_LABELS_INV={
+    value:key for key, value in MTC_LABELS.items()
+}
+
+# inverse frequency weights (roughly estimated)
+mtc_weights_= {
+    'No Data':0.0,
+    'Natural Vegetation': 1.0/0.2,
+    'Forest': 1.0/0.12,
+    'Corn' : 1.0/0.14,
+    'Soybeans' : 1.0/0.12,
+    'Wetlands': 1.0/0.08, 
+    'Developed/Barren': 1.0/0.079,
+    'Open Water':1.0/0.025,
+    'Winter Wheat':1.0/0.04,
+    'Alfalfa':1.0/0.035,
+    'Fallow/Idle Cropland': 1.0/0.035,
+    'Cotton':1.0/0.025,
+    'Sorghum':1.0/0.02,
+    'Other':1.0/0.07 
+}
+MTC_CLASSES=list(range(1,len(mtc_weights_)))
+
+# norm to sum: number of classes
+mtc_weights_=torch.tensor(list(mtc_weights_.values()))
+MTC_WEIGHTS=mtc_weights_*(len(mtc_weights_)/mtc_weights_.sum())
+print(MTC_WEIGHTS)
 
 # to represent labels as RGB-colors
 MTC_CLASS_COLORS=[
     (0, 0, 0),
-    (1.0, 0.4980392156862745, 0.054901960784313725)
+    (0.6823529411764706, 0.7803921568627451, 0.9098039215686274),
+    (1.0, 0.4980392156862745, 0.054901960784313725),
+    (1.0, 0.7333333333333333, 0.47058823529411764),
+    (0.17254901960784313, 0.6274509803921569, 0.17254901960784313),
+    (0.596078431372549, 0.8745098039215686, 0.5411764705882353),
+    (0.8392156862745098, 0.15294117647058825, 0.1568627450980392),
+    (1.0, 0.596078431372549, 0.5882352941176471),
+    (0.5803921568627451, 0.403921568627451, 0.7411764705882353),
+    (0.7725490196078432, 0.6901960784313725, 0.8352941176470589),
+    (0.5490196078431373, 0.33725490196078434, 0.29411764705882354),
+    (0.7686274509803922, 0.611764705882353, 0.5803921568627451),
+    (0.8901960784313725, 0.4666666666666667, 0.7607843137254902),
+    (0.9686274509803922, 0.7137254901960784, 0.8235294117647058),
 ]
 
 ####################################################################### FINE-TUNING: CDDS DATASET ################################################################################################
