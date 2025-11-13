@@ -275,7 +275,13 @@ def visualize_prediction_mtc(
     img_width=params.MTC_IMG_WIDTH
     label_img=label.reshape(img_width,img_width)
     pred_img=pred_classes.reshape(img_width,img_width)
-    eo_img=eo_data[:,timestep].reshape(img_width,img_width, num_chan)
+
+    # search for non-empty timestep
+    eo_rgb_tmp=eo_data[:,timestep]
+    while eo_data[:,timestep,[4,2,3]].sum()==0.0 and timestep<(params.CDDS_MAX_SEQ_LEN-1):
+        timestep +=1
+        eo_rgb_tmp=eo_data[:,timestep]
+    eo_img=eo_rgb_tmp.reshape(img_width,img_width, num_chan)
 
     # to numpy array
     pred_img=pred_img.detach().cpu().numpy() 

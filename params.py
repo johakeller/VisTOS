@@ -426,7 +426,6 @@ MTC_CLASSES=list(range(1,len(mtc_weights_)))
 # norm to sum: number of classes
 mtc_weights_=torch.tensor(list(mtc_weights_.values()))
 MTC_WEIGHTS=mtc_weights_*(len(mtc_weights_)/mtc_weights_.sum())
-print(MTC_WEIGHTS)
 
 # to represent labels as RGB-colors
 MTC_CLASS_COLORS=[
