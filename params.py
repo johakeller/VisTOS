@@ -244,6 +244,7 @@ P_MAX_SEQ_LEN=12 #12 months maximum sequence length for PASTIS-R
 P_BATCH_SIZE=P_IMG_WIDTH*8 # PASTIS-R number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 P_MAX_EPOCHS= 10 # number of fine-tuning epochs
 P_MAX_LR=1e-4 # maximum lerning rate for PASTIS-R
+P_MIN_LR=1e-6 # minimum lerning rate for PASTIS-R
 P_WEIGHT_DECAY=0.01 # weight decay term for PASTIS-R 
 
 # params for multi-class segmentation
@@ -359,7 +360,8 @@ MTC_TIME_STEPS=3
 MTC_NUMBER_CHANNELS=6
 MTC_BATCH_SIZE=7168 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 MTC_MAX_EPOCHS= 10 # number of fine-tuning epochs
-MTC_MAX_LR=1e-4 # maximum lerning rate 
+MTC_MAX_LR=1e-4 # maximum lerning rate for MTCC
+MTC_MIN_LR=1e-6 # minimum lerning rate for MTCC
 MTC_WEIGHT_DECAY=0.01 # weight decay term for 
 
 # coordinates are not available, calculate random coordinates from range of Brazilian Amazon [(min lat, max lat),(min long, max lon)]

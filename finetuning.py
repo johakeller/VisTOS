@@ -101,6 +101,7 @@ class FineTuning:
             batch_size=params.P_BATCH_SIZE
             self.epochs = params.P_MAX_EPOCHS
             self.max_learning_rate = params.P_MAX_LR
+            self.min_learning_rate = params.P_MIN_LR
             weight_decay=params.P_WEIGHT_DECAY
             vis_method=utils.visualize_prediction_pastis
             self.label_list = list(range(19))
@@ -139,6 +140,7 @@ class FineTuning:
             batch_size=params.MTC_BATCH_SIZE
             self.epochs = params.MTC_MAX_EPOCHS
             self.max_learning_rate = params.MTC_MAX_LR
+            self.min_learning_rate = params.MTC_MIN_LR
             weight_decay=params.MTC_WEIGHT_DECAY
             vis_method=utils.visualize_prediction_mtc
             self.label_list = params.MTC_CLASSES
