@@ -55,12 +55,10 @@ def run_training(
     # evaluation of fine-tuned model (must be in cache) 
     elif mode=='eval' and (dataset is not None):
         if os.path.isfile(pretrained_model_path) and (dataset is not None):
-            # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
-            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size).to(params.DEVICE)
             # take pre-trained Seq2Seq instance to construct fine-tuning model
             fine_tuning=finetuning.FineTuning(vis_field_size=vis_field_size, dataset=dataset)
             # run evaluation procedure with model
-            fine_tuning.init_finetuning(model_class, pretrained_model, params.FT_CHECKPOINT,True, model_type=model_type, vis_field_size=vis_field_size)
+            fine_tuning.init_finetuning(model_class, params.FT_CHECKPOINT,True, model_type=model_type, vis_field_size=vis_field_size)
         else:
             raise FileNotFoundError(f'{pretrained_model_path} not found.')
     # no dataset indicated or mode unknown

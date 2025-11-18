@@ -354,13 +354,14 @@ elif environment_ =='hpc':
 else:
     MTCC_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/multi-temporal-crop-classification/'
 
+MTCC_MAX_LEN=224*224
 MTCC_IMG_WIDTH=224 # length of square side of image
 MTCC_NUM_PIXELS=MTCC_IMG_WIDTH**2 # number of pixels per image
 MTCC_MAX_SEQ_LEN=12
 MTCC_TIME_STEPS=3
 MTCC_NUMBER_CHANNELS=6
 MTCC_BATCH_SIZE= 7168 #1792 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
-MTCC_MAX_EPOCHS= 5 # number of fine-tuning epochs
+MTCC_MAX_EPOCHS= 3 # number of fine-tuning epochs
 MTCC_MAX_LR=3e-5 # maximum lerning rate 
 MTCC_MIN_LR=1e-6
 MTCC_WEIGHT_DECAY=0.04 # weight decay term 

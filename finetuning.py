@@ -109,6 +109,7 @@ class FineTuning:
             self.min_learning_rate = params.P_MIN_LR
             weight_decay=params.P_WEIGHT_DECAY
             vis_method=utils.visualize_prediction_pastis
+            # exclude Void class
             self.label_list = list(range(19))
             # FTL params
             classes=params.P_TVERSKY_CLASSES
@@ -150,7 +151,8 @@ class FineTuning:
             self.min_learning_rate = params.MTCC_MIN_LR
             weight_decay=params.MTCC_WEIGHT_DECAY
             vis_method=utils.visualize_prediction_mtcc
-            self.label_list = params.MTCC_CLASSES
+            # exclude No Data class
+            self.label_list = list(range(1,14))
             # CE params
             weight = params.MTCC_WEIGHTS.to(params.DEVICE)
             label_smoothing=params.MTCC_CE_LABEL_SMOOTHING
@@ -412,18 +414,19 @@ class FineTuning:
         print(f'\nTrainable params: {params_sum}.')
 
     @staticmethod
-    def class_confidence(labels_true, prob_pred, labels):
+    def class_confidence(labels_true, prob_pred, labels, offset=0):
         '''
         Calculates average confidences for positive instances of a label and returns a dictionary:
         label (int): confidence (float).
         '''
 
         conf_dict = {}
+
         for label in labels:
             # mask for true instances for class label
             true_mask = labels_true == label
             # mean over label true instances
-            conf_dict[label] = prob_pred[true_mask, label].mean()
+            conf_dict[label] = prob_pred[true_mask, label-offset].mean()
         return conf_dict
 
     def compute_metrics(self, raw_pred, label):
@@ -482,7 +485,8 @@ class FineTuning:
             'roc_auc':roc_auc_score(
                 label_np, prob_pred, labels=self.label_list, average='macro', multi_class='ovo'
             ),
-            'confidence': self.class_confidence(label_np, prob_pred, labels=self.label_list),
+            # different indexing for MTCC
+            'confidence': self.class_confidence(label_np, prob_pred, labels=self.label_list) if self.dataset=='PASTIS-R' else self.class_confidence(label_np, prob_pred, labels=self.label_list, offset=1),
             # return confusion matrix as list
             'confusion_matrix': confusion_matrix(
                 label_np, prediction, labels=self.label_list

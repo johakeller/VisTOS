@@ -29,7 +29,7 @@ class MultiTempCropClass(IterableDataset):
         self, 
         split='train', 
         batch_size=params.MTCC_BATCH_SIZE, 
-        max_length=None, 
+        max_length=params.MTCC_MAX_LEN, 
         shuffle=False, 
         seed=123
     ):      
@@ -75,17 +75,11 @@ class MultiTempCropClass(IterableDataset):
                 print(f'File chips_df.csv must be in {params.MTCC_PATH}', e)
             sys.exit(1)
 
-        max_num_samples=len(self.sample_idx)*params.MTCC_NUM_PIXELS
-        # check if enough samples available for desired length (in pixels) of the dataset
-        if (max_length is not None) and (max_length > max_num_samples):
-            raise IndexError(f'Length {max_length} is exceeding actual number of samples: ({max_num_samples})')
-        else:
-            # if parameter is set, limits the length of the dataset
-            self.data_length=max_length if max_length is not None else max_num_samples
         # number of samples (images) used
-        self.num_samples=self.data_length//params.MTCC_NUM_PIXELS
+        self.num_samples=len(self.sample_idx)
+        self.data_length=self.num_samples*params.MTCC_NUM_PIXELS
         # list of sample indices used
-        self.sample_idx=self.sample_idx[:self.num_samples] 
+        self.sample_idx=self.sample_idx[:1] 
         # get number of original pre-training input bands
         self.num_bands= sum(values['length'] for values in params.CHANNEL_GROUPS.values()) # exclude DW, include B9
 
