@@ -244,8 +244,9 @@ P_MAX_SEQ_LEN=12 #12 months maximum sequence length for PASTIS-R
 P_BATCH_SIZE=P_IMG_WIDTH*8 # PASTIS-R number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 P_MAX_EPOCHS= 10 # number of fine-tuning epochs
 P_MAX_LR=1e-4 # maximum lerning rate for PASTIS-R
-P_MIN_LR=1e-6 # minimum lerning rate for PASTIS-R
+P_MIN_LR=1e-6
 P_WEIGHT_DECAY=0.01 # weight decay term for PASTIS-R 
+P_DROPOUT=0.1
 
 # params for multi-class segmentation
 P_TVERSKY_ALPHA=0.6 # penalization for false positives (FTL)
@@ -354,15 +355,16 @@ else:
     MTC_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/multi-temporal-crop-classification/'
 
 MTC_IMG_WIDTH=224 # length of square side of image
-MTC_NUM_PIXELS=MTC_IMG_WIDTH**2 # number of pixels per CDDS-image
+MTC_NUM_PIXELS=MTC_IMG_WIDTH**2 # number of pixels per image
 MTC_MAX_SEQ_LEN=12
 MTC_TIME_STEPS=3
 MTC_NUMBER_CHANNELS=6
-MTC_BATCH_SIZE=7168 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
-MTC_MAX_EPOCHS= 10 # number of fine-tuning epochs
-MTC_MAX_LR=1e-4 # maximum lerning rate for MTCC
-MTC_MIN_LR=1e-6 # minimum lerning rate for MTCC
-MTC_WEIGHT_DECAY=0.01 # weight decay term for 
+MTC_BATCH_SIZE= 7168 #1792 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+MTC_MAX_EPOCHS= 5 # number of fine-tuning epochs
+MTC_MAX_LR=3e-5 # maximum lerning rate 
+MTC_MIN_LR=1e-6
+MTC_WEIGHT_DECAY=0.04 # weight decay term 
+MTC_DROPOUT=0.25 # global dropout rate
 
 # coordinates are not available, calculate random coordinates from range of Brazilian Amazon [(min lat, max lat),(min long, max lon)]
 MTC_COORD_RANGE=[(-15, 5),(-75,-45)]
@@ -447,78 +449,3 @@ MTC_CLASS_COLORS=[
     (0.9686274509803922, 0.7137254901960784, 0.8235294117647058),
 ]
 
-####################################################################### FINE-TUNING: CDDS DATASET ################################################################################################
-
-# Cameroon deforestation driver classification (original dataset)
-CAMEROON_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/CameroonDeforestationDriversDataset' # local path to original dataset for pipeline
-CAMEROON_LABELS_PTH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/CameroonDeforestationDriversDataset/all.csv' # local path to original all.csv for pipeline
-
-# Cameroon Deforestation Driver Segmentation (CDDS) dataset
-# CDDS: on Colab
-if environment_ == 'colab':
-    CDDS_PATH='/content/CDDS'
-# CDDS: on Cluster: Portia
-elif environment_ =='cluster_portia':
-    CDDS_PATH=os.path.expanduser('~/data/CDDS')
-# CDDS: on Cluster: Hex, Hal
-elif environment_ =='cluster':
-    CDDS_PATH='/shared/datasets/CDDS'
-# default: local path
-else:
-    CDDS_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/CDDS' # local path to CDDS dataset 
-CDDS_TRAIN_PATH=os.path.join(CDDS_PATH,'train.csv') # path to CDDS training dataset .csv file
-CDDS_TEST_PATH=os.path.join(CDDS_PATH,'test.csv') # path to CDDS test dataset .csv file
-CDDS_VAL_PATH=os.path.join(CDDS_PATH,'val.csv') # path to CDDS validation dataset .csv file
-
-# dataset pipeline
-CDDS_S2_NORM_FACTOR=0.0001 # normalization factor for Sentinel-2 data
-CDDS_IMG_WIDTH=332 # length of square side of image
-CDDS_NUM_PIXELS=CDDS_IMG_WIDTH**2 # number of pixels per CDDS-image
-CDDS_SCALE=15 # used for dataset
-CDDS_SPATIAL_EXTENT=CDDS_IMG_WIDTH*CDDS_SCALE # spatial extent in meters -> 332 pixels * 30m
-CDDS_MAX_SEQ_LEN=24 # 24 months necessary for ForestSeg
-# merged labels to int
-CDDS_LABELS={
-    'No deforestation':0,
-    'Plantation': 1,
-    'Smallholder agriculture': 2,
-    'Other' : 3,
-    'Grassland shrubland' : 4,
-}
-# to address label name via value
-CDDS_LABELS_INV={
-    value:key for key, value in CDDS_LABELS.items()
-}
-CDDS_NUM_OUTPUTS=len(CDDS_LABELS) # number of merged labels
-
-# fine-tuning training
-# Focal Tversky loss: https://smp.readthedocs.io/en/latest/_modules/segmentation_models_pytorch/losses/tversky.html#TverskyLoss
-CDDS_TVERSKY_ALPHA=0.2 # penalization for false positives (FTL)
-CDDS_TVERSKY_BETA=0.8 # penalization for false negatives (FTL)
-CDDS_TVERSKY_GAMMA=2.0 # focus on rare classes (FTL)
-CDDS_LAMBDA_1=0.1 # FTL ratio in combined loss
-CDDS_LAMBDA_2=1-CDDS_LAMBDA_1 # cross-entropy ratio in combined loss
-CDDS_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
-
-# hardcoded merged label weights based on init_class_weights() in forestnet_dataset.py, normalized by 'No deforestation' weight
-cdds_weights_= {
-    'No deforestation': 7.932049558081326e-09,
-    'Plantation': 2.163298771029968e-06,
-    'Smallholder agriculture' : 5.017783023033631e-07,
-    'Other' : 2.7994345142281258e-06,
-    'Grassland shrubland': 1.2678288431061807e-05,
-}
-# exponent delta, to flatten cross-entropy class weights
-delta_cdds_weights_=0.5
-norm_cdds_weights_=cdds_weights_['No deforestation']**delta_cdds_weights_ # apply delta to normalization factor
-
-CDDS_WEIGHTS=(np.array(list(cdds_weights_.values()))**delta_cdds_weights_)/norm_cdds_weights_ # normalize weights
-
-# colormap to display predicted labels in RGB
-CDDS_CLASS_COLORS=[
-    (0, 0, 0),                                                          # No deforestation  
-    (0.6823529411764706, 0.7803921568627451, 0.9098039215686274),       # Plantation
-    (1.0, 0.4980392156862745, 0.054901960784313725),                    # Smallholder agriculture
-    (1.0, 0.7333333333333333, 0.47058823529411764),                     # Other
-    (0.17254901960784313, 0.6274509803921569, 0.17254901960784313),     # Grassland shrubland
-]

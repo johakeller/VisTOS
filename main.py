@@ -36,7 +36,7 @@ def run_training(
     # pre-training: run x epochs of training, followed by validation, save model to file
     if mode=='pretrain':
         # create model instance (params defined in module params)
-        model=model_class.VistosTimeSeriesSeq2Seq.construct(vis_field_size=vis_field_size).to(params.DEVICE)
+        model=model_class.VistosTimeSeriesSeq2Seq.construct(vis_field_size=vis_field_size, dropout=params.DROPOUT).to(params.DEVICE)
         # initialize PreTraining object
         pre_training=pretraining.PreTraining(vis_field_size=vis_field_size)
         # run pretraining procedure with model
@@ -45,12 +45,10 @@ def run_training(
     # fine-tuning
     elif mode=='finetune' and (dataset is not None):
         if os.path.isfile(pretrained_model_path):
-            # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
-            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size).to(params.DEVICE)
             # take pre-trained Seq2Seq instance to construct fine-tuning model
             fine_tuning=finetuning.FineTuning(vis_field_size=vis_field_size, dataset=dataset)
             # run fine-tuning procedure with model
-            fine_tuning.init_finetuning(pretrained_model, params.FT_CHECKPOINT,False, model_type=model_type)
+            fine_tuning.init_finetuning(model_class, params.FT_CHECKPOINT,False, model_type=model_type, vis_field_size=vis_field_size)
         else:
             raise FileNotFoundError(f'{pretrained_model_path} not found.')
 
@@ -62,7 +60,7 @@ def run_training(
             # take pre-trained Seq2Seq instance to construct fine-tuning model
             fine_tuning=finetuning.FineTuning(vis_field_size=vis_field_size, dataset=dataset)
             # run evaluation procedure with model
-            fine_tuning.init_finetuning(pretrained_model, params.FT_CHECKPOINT,True, model_type=model_type)
+            fine_tuning.init_finetuning(model_class, pretrained_model, params.FT_CHECKPOINT,True, model_type=model_type, vis_field_size=vis_field_size)
         else:
             raise FileNotFoundError(f'{pretrained_model_path} not found.')
     # no dataset indicated or mode unknown

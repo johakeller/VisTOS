@@ -366,7 +366,7 @@ class VistosTimeSeriesSeq2Seq(nn.Module):
         return model
 
     @classmethod
-    def load_pretrained(cls, vis_field_size):
+    def load_pretrained(cls, vis_field_size, dropout):
         '''
         Method to load weights from pretrained Seq2Seq model or if pretraining not finished but
         cache model dict was moved to output, load the pre-trained model from the dict.

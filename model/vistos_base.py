@@ -195,7 +195,7 @@ class Block(nn.Module):
         mlp_ratio=params.MLP_RATIO,
         qkv_bias=params.QKV_BIAS,
         qk_norm=False,
-        drop=params.DROPOUT,
+        dropout=params.DROPOUT,
         attn_drop=params.DROPOUT,
         init_values=params.LAYER_SCALE,
         act_layer=nn.GELU,
@@ -211,7 +211,7 @@ class Block(nn.Module):
             qkv_bias=qkv_bias,
             qk_norm=qk_norm,
             attn_drop=attn_drop,
-            proj_drop=drop,
+            proj_drop=dropout,
             norm_layer=norm_layer,
         )
         # layer scale 1
@@ -223,7 +223,7 @@ class Block(nn.Module):
             in_features=dim,
             hidden_features=int(dim * mlp_ratio),
             act_layer=act_layer,
-            drop=drop,
+            drop=dropout,
         )
         # layer scale 2
         self.ls2 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
@@ -339,6 +339,7 @@ class EncoderBase(nn.Module):
         depth: int =params.DEPTH,
         mlp_ratio: int =params.MLP_RATIO,
         num_heads: int =params.NUM_HEADS,
+        dropout:float=params.DROPOUT,
         max_sequence_length:int =params.MAX_SEQ_LEN,
         vis_field_size:int=params.VIS_FIELDS[0],
         mode: str='pretrain', 
@@ -396,6 +397,8 @@ class EncoderBase(nn.Module):
                     mlp_ratio,
                     qkv_bias=True,
                     norm_layer=nn.LayerNorm,
+                    dropout=dropout,
+                    attn_drop=dropout,
                 )
                 for _ in range(depth)
             ]
@@ -535,6 +538,7 @@ class DecoderBase(nn.Module):
         decoder_num_heads=params.NUM_HEADS,
         mlp_ratio=params.DECODER_MLP_RATIO,
         max_sequence_length=params.MAX_SEQ_LEN,
+        dropout=params.DROPOUT,
     ):
         super().__init__()
 
@@ -562,6 +566,8 @@ class DecoderBase(nn.Module):
                     mlp_ratio,
                     qkv_bias=True,
                     norm_layer=nn.LayerNorm,
+                    dropout=dropout,
+                    attn_drop=dropout,
                 )
                 for _ in range(decoder_depth)
             ]

@@ -29,6 +29,7 @@ from tqdm import tqdm
 import params
 import utils
 from dataset import multitempcrop_dataset, pastis_r_dataset
+from model import vistos_att_model
 
 # set scaler for mixed precision training 
 scaler = torch.GradScaler(enabled=torch.cuda.is_available())
@@ -59,6 +60,8 @@ class FineTuning:
         checkpointing=True, 
         eval_mode=False, 
         model_type='att',
+        model_class=vistos_att_model,
+        vis_field_size=params.VIS_FIELDS[0],
     ):
         '''
         Start of the finetuning logic for fine-tuning of semantic segmentation. Initializes the 
@@ -71,7 +74,6 @@ class FineTuning:
         spatial encoding. The type is passed via model_type argument. Cache-loading behavior is 
         defined via checkpointing argument.
         '''
-
         # init logger
         self.logger = utils.init_logger(name=f'finetuning_{self.dataset}_{model_type}_vf{self.vis_field_size}')
         # set start epoch, start iteration, previous loss to 0
@@ -84,6 +86,9 @@ class FineTuning:
 
         # PASTIS-R branch
         if self.dataset == 'PASTIS-R':
+            # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
+            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size, dropout=params.P_DROPOUT).to(params.DEVICE)
+        
             # construct the fine-tunig model from the pre-trained model
             model = pretrained_model.construct_finetuning_model(
                 num_outputs=params.P_NUM_OUTPUTS,
@@ -123,6 +128,8 @@ class FineTuning:
 
         # MTC branch
         elif self.dataset == 'MTC':
+            # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
+            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size, dropout=params.MTC_DROPOUT).to(params.DEVICE)
             # construct the fine-tunig model from the pretrained model
             model = pretrained_model.construct_finetuning_model(
                 num_outputs=params.MTC_NUM_OUTPUTS,

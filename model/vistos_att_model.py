@@ -41,6 +41,7 @@ class Encoder(vistos_base.EncoderBase,nn.Module):
         max_sequence_length:int =params.MAX_SEQ_LEN,
         vis_field_size:int=params.VIS_FIELDS[0],
         mode: str='pretrain', 
+        dropout=params.DROPOUT,
     ):
         super().__init__(
             embedding_size=embedding_size,
@@ -52,6 +53,7 @@ class Encoder(vistos_base.EncoderBase,nn.Module):
             max_sequence_length=max_sequence_length,
             vis_field_size=vis_field_size,
             mode=mode,
+            dropout=dropout,
         )
         # unfold to visual fields 
         self.unfold=nn.Unfold(kernel_size=(self.vis_field_size,self.vis_field_size), padding=0, stride=1)
@@ -65,6 +67,8 @@ class Encoder(vistos_base.EncoderBase,nn.Module):
                     mlp_ratio,
                     qkv_bias=True,
                     norm_layer=nn.LayerNorm,
+                    dropout=dropout,
+                    attn_drop=dropout,
                 )
                 for _ in range(depth)
             ]
@@ -298,6 +302,7 @@ class Decoder(vistos_base.DecoderBase, nn.Module):
         mlp_ratio=params.DECODER_MLP_RATIO,
         max_sequence_length=params.MAX_SEQ_LEN,
         vis_field_size:int=params.VIS_FIELDS[0],
+        dropout=params.DROPOUT,
     ):
         super().__init__(
             channel_embeddings=channel_embeddings,
@@ -307,6 +312,7 @@ class Decoder(vistos_base.DecoderBase, nn.Module):
             decoder_num_heads=decoder_num_heads,
             mlp_ratio=mlp_ratio,
             max_sequence_length=max_sequence_length,
+            dropout=dropout,
         )
         # set visual field size for convolution at the beginning of forward() method
         self.vis_field_size=vis_field_size
@@ -396,7 +402,8 @@ class VistosTimeSeriesSeq2Seq(nn.Module):
         decoder_depth:int=params.DEPTH,
         decoder_num_heads:int=params.NUM_HEADS,
         max_sequence_length:int=params.MAX_SEQ_LEN,
-        vis_field_size:int=params.VIS_FIELDS[0]
+        vis_field_size:int=params.VIS_FIELDS[0],
+        dropout:float=params.DROPOUT,
     ):
         encoder = Encoder(
             embedding_size=encoder_embedding_size,
@@ -406,7 +413,8 @@ class VistosTimeSeriesSeq2Seq(nn.Module):
             mlp_ratio=mlp_ratio,
             num_heads=encoder_num_heads,
             max_sequence_length=max_sequence_length,
-            vis_field_size=vis_field_size
+            vis_field_size=vis_field_size,
+            dropout=dropout,
         )
         decoder = Decoder(
             channel_embeddings=encoder.channel_embed,
@@ -416,7 +424,8 @@ class VistosTimeSeriesSeq2Seq(nn.Module):
             decoder_num_heads=decoder_num_heads,
             mlp_ratio=mlp_ratio,
             max_sequence_length=max_sequence_length,
-            vis_field_size=vis_field_size
+            vis_field_size=vis_field_size,
+            dropout=dropout,
         )
         return cls(encoder, decoder)
 
@@ -434,7 +443,7 @@ class VistosTimeSeriesSeq2Seq(nn.Module):
         head1=SimpleFinetuningHead(
             num_outputs=num_outputs,
             hidden_size=self.encoder.embedding_size,
-            vis_field_size=vis_field_size
+            vis_field_size=vis_field_size,
         )
                     # take encoder only from self instance, change mode to finetune for correct embedding
         model = VistosFinetuningSimple(self.encoder, head1, img_width=img_width).to(params.DEVICE)
@@ -442,13 +451,13 @@ class VistosTimeSeriesSeq2Seq(nn.Module):
         return model
     
     @classmethod
-    def load_pretrained(cls, vis_field_size):
+    def load_pretrained(cls, vis_field_size, dropout):
         '''
         Method to load weights from pretrained Seq2Seq model or if pretraining not finished but
         cache model dict was moved to output, load the pre-trained model from the dict.
         '''
         # create model with embedding dimensions of the pretraining dataset (12 months)
-        model=cls.construct(vis_field_size=vis_field_size)
+        model=cls.construct(vis_field_size=vis_field_size, dropout=dropout)
         # saved model is either model or dict if pretraining not finished and dict renamed
         saved_model=torch.load(os.path.join(params.OUTPUT, f'att_model_weights_vf{vis_field_size}.pth'), map_location=params.DEVICE, weights_only=True)
         if 'model'in saved_model:
