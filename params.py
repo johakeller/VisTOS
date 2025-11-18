@@ -2,7 +2,7 @@
 Defines central parameters for the entire program. Steers general parameters, 
 pretraining-dataset-specific parameters, masking-specific paramters, 
 model-specific parameters, general fine-tuning hyperparameters, PASTIS-R 
-dataset-specific parameters, and CDDS dataset-specific parameters.
+dataset-specific parameters, and MTCC dataset-specific parameters.
 '''
 
 import os
@@ -340,54 +340,54 @@ P_CLASS_COLORS=[
 # paths
 # paths Colab
 if environment_ == 'colab':
-    MTC_PATH='/content/multi-temporal-crop-classification/'
+    MTCC_PATH='/content/multi-temporal-crop-classification/'
 # paths Cluster: Hex, Hal
 elif environment_ == 'cluster':
-    MTC_PATH='/shared/datasets/multi-temporal-crop-classification/'
+    MTCC_PATH='/shared/datasets/multi-temporal-crop-classification/'
 # Portia
 elif environment_ == 'cluster_portia':
-    MTC_PATH=os.path.expanduser('~/multi-temporal-crop-classification/')
+    MTCC_PATH=os.path.expanduser('~/multi-temporal-crop-classification/')
 # HPC
 elif environment_ =='hpc':
-    MTC_PATH='/scratch/johakeller/datasets/multi-temporal-crop-classification/'
+    MTCC_PATH='/scratch/johakeller/datasets/multi-temporal-crop-classification/'
 # default: local path
 else:
-    MTC_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/multi-temporal-crop-classification/'
+    MTCC_PATH='/home/johakeller/Documents/Master_Computer_Science/Master_Thesis/Workspace2/data/multi-temporal-crop-classification/'
 
-MTC_IMG_WIDTH=224 # length of square side of image
-MTC_NUM_PIXELS=MTC_IMG_WIDTH**2 # number of pixels per image
-MTC_MAX_SEQ_LEN=12
-MTC_TIME_STEPS=3
-MTC_NUMBER_CHANNELS=6
-MTC_BATCH_SIZE= 7168 #1792 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
-MTC_MAX_EPOCHS= 5 # number of fine-tuning epochs
-MTC_MAX_LR=3e-5 # maximum lerning rate 
-MTC_MIN_LR=1e-6
-MTC_WEIGHT_DECAY=0.04 # weight decay term 
-MTC_DROPOUT=0.25 # global dropout rate
+MTCC_IMG_WIDTH=224 # length of square side of image
+MTCC_NUM_PIXELS=MTCC_IMG_WIDTH**2 # number of pixels per image
+MTCC_MAX_SEQ_LEN=12
+MTCC_TIME_STEPS=3
+MTCC_NUMBER_CHANNELS=6
+MTCC_BATCH_SIZE= 7168 #1792 # number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
+MTCC_MAX_EPOCHS= 5 # number of fine-tuning epochs
+MTCC_MAX_LR=3e-5 # maximum lerning rate 
+MTCC_MIN_LR=1e-6
+MTCC_WEIGHT_DECAY=0.04 # weight decay term 
+MTCC_DROPOUT=0.25 # global dropout rate
 
 # coordinates are not available, calculate random coordinates from range of Brazilian Amazon [(min lat, max lat),(min long, max lon)]
 MTC_COORD_RANGE=[(-15, 5),(-75,-45)]
 
 # number of classes
-MTC_NUM_OUTPUTS=14
+MTCC_NUM_OUTPUTS=14
 
-MTC_TVERSKY_ALPHA=0.3 # penalization for false positives (FTL)
-MTC_TVERSKY_BETA=0.7 # penalization for false negatives (FTL)
-MTC_TVERSKY_GAMMA=1.33 # focus on rare classes (FTL)
-MTC_LAMBDA_1=0.7 # FTL ratio in combined loss
-MTC_LAMBDA_2=1-MTC_LAMBDA_1 # cross-entropy ratio in combined loss
-MTC_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
+MTCC_TVERSKY_ALPHA=0.3 # penalization for false positives (FTL)
+MTCC_TVERSKY_BETA=0.7 # penalization for false negatives (FTL)
+MTCC_TVERSKY_GAMMA=1.33 # focus on rare classes (FTL)
+MTCC_LAMBDA_1=0.7 # FTL ratio in combined loss
+MTCC_LAMBDA_2=1-MTCC_LAMBDA_1 # cross-entropy ratio in combined loss
+MTCC_CE_LABEL_SMOOTHING=0.1 # label smoothing term for cross-entropy
 
-MTC_CHANNEL_GROUPS={
+MTCC_CHANNEL_GROUPS={
     'S2_RGB':[0,1,2],
     'S2_NIR_20':[3],
     'S2_SWIR':[4,5]
 }
 # normalization factor
-MTC_NORM=1.0/10000.0
+MTCC_NORM=1.0/10000.0
 
-MTC_LABELS={
+MTCC_LABELS={
     'No Data':0,
     'Natural Vegetation': 1,
     'Forest': 2,
@@ -404,12 +404,12 @@ MTC_LABELS={
     'Other':13 
 }
 # to address label name via value
-MTC_LABELS_INV={
-    value:key for key, value in MTC_LABELS.items()
+MTCC_LABELS_INV={
+    value:key for key, value in MTCC_LABELS.items()
 }
 
 # inverse frequency weights (roughly estimated)
-mtc_weights_= {
+mtcc_weights_= {
     'No Data':0.0,
     'Natural Vegetation': 1.0/0.2,
     'Forest': 1.0/0.12,
@@ -425,14 +425,14 @@ mtc_weights_= {
     'Sorghum':1.0/0.02,
     'Other':1.0/0.07 
 }
-MTC_CLASSES=list(range(1,len(mtc_weights_)))
+MTCC_CLASSES=list(range(1,len(mtcc_weights_)))
 
 # norm to sum: number of classes
-mtc_weights_=torch.tensor(list(mtc_weights_.values()))
-MTC_WEIGHTS=mtc_weights_*(len(mtc_weights_)/mtc_weights_.sum())
+mtcc_weights_=torch.tensor(list(mtcc_weights_.values()))
+MTCC_WEIGHTS=mtcc_weights_*(len(mtcc_weights_)/mtcc_weights_.sum())
 
 # to represent labels as RGB-colors
-MTC_CLASS_COLORS=[
+MTCC_CLASS_COLORS=[
     (0, 0, 0),
     (0.6823529411764706, 0.7803921568627451, 0.9098039215686274),
     (1.0, 0.4980392156862745, 0.054901960784313725),

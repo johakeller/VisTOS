@@ -20,7 +20,7 @@ from torch.utils.data import IterableDataset
 import params
 
 
-class MultiTempCrop(IterableDataset):
+class MultiTempCropClass(IterableDataset):
     '''
     Dataset class for BraDD-S1TS dataset.
     '''
@@ -28,7 +28,7 @@ class MultiTempCrop(IterableDataset):
     def __init__(
         self, 
         split='train', 
-        batch_size=params.MTC_BATCH_SIZE, 
+        batch_size=params.MTCC_BATCH_SIZE, 
         max_length=None, 
         shuffle=False, 
         seed=123
@@ -39,14 +39,14 @@ class MultiTempCrop(IterableDataset):
 
         # split defines which part of the dataset to load
         if split=='train':
-            data_path= os.path.join(params.MTC_PATH, 'training_data.txt') 
-            self.samples_path=os.path.join(params.MTC_PATH, 'training_chips')
+            data_path= os.path.join(params.MTCC_PATH, 'training_data.txt') 
+            self.samples_path=os.path.join(params.MTCC_PATH, 'training_chips')
         elif split=='test':
-            data_path= os.path.join(params.MTC_PATH, 'test_data.txt') 
-            self.samples_path=os.path.join(params.MTC_PATH, 'test_chips')
+            data_path= os.path.join(params.MTCC_PATH, 'test_data.txt') 
+            self.samples_path=os.path.join(params.MTCC_PATH, 'test_chips')
         elif split=='validation':
-           data_path= os.path.join(params.MTC_PATH, 'validation_data.txt') 
-           self.samples_path=os.path.join(params.MTC_PATH, 'validation_chips')
+           data_path= os.path.join(params.MTCC_PATH, 'validation_data.txt') 
+           self.samples_path=os.path.join(params.MTCC_PATH, 'validation_chips')
         else:
             raise NotImplementedError(f'Split {split} not implemented.')
         
@@ -59,23 +59,23 @@ class MultiTempCrop(IterableDataset):
 
         except FileNotFoundError as e:
             if split == 'train':
-                print(f'File training_data.txt must be in {params.MTC_PATH}', e)
+                print(f'File training_data.txt must be in {params.MTCC_PATH}', e)
             else:
-                print(f'File {split}_data.txt must be in {params.MTC_PATH}', e)
+                print(f'File {split}_data.txt must be in {params.MTCC_PATH}', e)
             sys.exit(1)
 
         # get corresponding metadata
-        chips_df_path= os.path.join(params.MTC_PATH, 'chips_df.csv') 
+        chips_df_path= os.path.join(params.MTCC_PATH, 'chips_df.csv') 
         try:
             chips_df=pd.read_csv(chips_df_path).set_index("chip_id", drop=False)
             # metadata dictionary
             self.meta=chips_df.to_dict(orient='index')
         except FileNotFoundError as e:
             if split == 'train':
-                print(f'File chips_df.csv must be in {params.MTC_PATH}', e)
+                print(f'File chips_df.csv must be in {params.MTCC_PATH}', e)
             sys.exit(1)
 
-        max_num_samples=len(self.sample_idx)*params.MTC_NUM_PIXELS
+        max_num_samples=len(self.sample_idx)*params.MTCC_NUM_PIXELS
         # check if enough samples available for desired length (in pixels) of the dataset
         if (max_length is not None) and (max_length > max_num_samples):
             raise IndexError(f'Length {max_length} is exceeding actual number of samples: ({max_num_samples})')
@@ -83,7 +83,7 @@ class MultiTempCrop(IterableDataset):
             # if parameter is set, limits the length of the dataset
             self.data_length=max_length if max_length is not None else max_num_samples
         # number of samples (images) used
-        self.num_samples=self.data_length//params.MTC_NUM_PIXELS
+        self.num_samples=self.data_length//params.MTCC_NUM_PIXELS
         # list of sample indices used
         self.sample_idx=self.sample_idx[:self.num_samples] 
         # get number of original pre-training input bands
@@ -106,7 +106,7 @@ class MultiTempCrop(IterableDataset):
         for idx, sample_id in enumerate(self.sample_idx):
 
             # create orig. sized array with 0s to represent missing bands, dimensions (num_orig_bands, 332, 332)
-            eo_style_array = torch.zeros([self.num_bands, params.MTC_MAX_SEQ_LEN,params.MTC_IMG_WIDTH, params.MTC_IMG_WIDTH])
+            eo_style_array = torch.zeros([self.num_bands, params.MTCC_MAX_SEQ_LEN,params.MTCC_IMG_WIDTH, params.MTCC_IMG_WIDTH])
             # indicate non-available channels with 1
             eo_style_mask = torch.ones_like(eo_style_array)
 
@@ -114,9 +114,9 @@ class MultiTempCrop(IterableDataset):
             eo_style_array, eo_style_mask, eo_style_label, coords, start_month=self.prepare_channel_input(sample_id, eo_style_array, eo_style_mask)    
 
             # iterate over the pixels of the EO array and the corresponding mask and label
-            for pix_id in range(params.MTC_NUM_PIXELS):
+            for pix_id in range(params.MTCC_NUM_PIXELS):
                 # check if reached max number of samples in last sample
-                if idx == self.num_samples and pix_id >= (self.data_length%params.MTC_NUM_PIXELS):
+                if idx == self.num_samples and pix_id >= (self.data_length%params.MTCC_NUM_PIXELS):
                     break
                 # obtain pixel time series
                 eo_data_vf=eo_style_array[pix_id].float().to(params.DEVICE)
@@ -160,8 +160,8 @@ class MultiTempCrop(IterableDataset):
         positioning the randomly generated coordinates from a passed range in the 
         center of the image.
         '''
-        width=params.MTC_IMG_WIDTH
-        height=params.MTC_IMG_WIDTH
+        width=params.MTCC_IMG_WIDTH
+        height=params.MTCC_IMG_WIDTH
         # get rows and column matrices
         rows, cols=np.meshgrid(np.arange(height), np.arange(width), indexing="ij")
         # get coordinates from affine transform
@@ -196,9 +196,9 @@ class MultiTempCrop(IterableDataset):
         # (t*c, h,w)
         eo_data=torch.from_numpy(eo_data.astype(np.float32, copy=False))
         # normalize to range [0,1]
-        eo_data=eo_data*params.MTC_NORM
+        eo_data=eo_data*params.MTCC_NORM
         # get into shape (c,t, h, w)
-        eo_data=eo_data.reshape(params.MTC_TIME_STEPS,params.MTC_NUMBER_CHANNELS,params.MTC_IMG_WIDTH, params.MTC_IMG_WIDTH)
+        eo_data=eo_data.reshape(params.MTCC_TIME_STEPS,params.MTCC_NUMBER_CHANNELS,params.MTCC_IMG_WIDTH, params.MTCC_IMG_WIDTH)
         eo_data=eo_data.permute(1,0,2,3)
 
         # label data path
@@ -215,7 +215,7 @@ class MultiTempCrop(IterableDataset):
         # insert into EO-style tensor -> select the correct channel groups
         # RGB
         rgb_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S2_RGB']['idx']))
-        src_rgb_idx=params.MTC_CHANNEL_GROUPS['S2_RGB']
+        src_rgb_idx=params.MTCC_CHANNEL_GROUPS['S2_RGB']
         # fill in data
         eo_tensor[rgb_idx[:,None], month_idx]=eo_data[src_rgb_idx]
         # update EO mask
@@ -223,7 +223,7 @@ class MultiTempCrop(IterableDataset):
 
         # NIR
         nir_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S2_NIR_20']['idx']))
-        src_nir_idx=params.MTC_CHANNEL_GROUPS['S2_NIR_20']
+        src_nir_idx=params.MTCC_CHANNEL_GROUPS['S2_NIR_20']
         # fill in data
         eo_tensor[nir_idx[:,None], month_idx]=eo_data[src_nir_idx]
         # update EO mask
@@ -231,7 +231,7 @@ class MultiTempCrop(IterableDataset):
 
         # SWIR
         swir_idx=torch.as_tensor(list(params.CHANNEL_GROUPS['S2_SWIR']['idx']))
-        src_swir_idx=params.MTC_CHANNEL_GROUPS['S2_SWIR']
+        src_swir_idx=params.MTCC_CHANNEL_GROUPS['S2_SWIR']
         # fill in data
         eo_tensor[swir_idx[:,None], month_idx]=eo_data[src_swir_idx]
         # update EO mask

@@ -460,7 +460,7 @@ class EncoderBase(nn.Module):
 
     def set_img_width(self,img_width):
         '''
-        Set width of input image (CDDS and PASTIS-R) for spatial
+        Set width of input image (MTCC and PASTIS-R) for spatial
         encoding. 
         '''
 

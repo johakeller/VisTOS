@@ -106,88 +106,6 @@ def visualize_images_pretraining(eo_data):
     plt.tight_layout()
     plt.show()
 
-def visualize_prediction_cdds(
-    eo_data:torch.Tensor, 
-    preds:torch.Tensor,  
-    label:torch.Tensor,  
-    title: str,
-    timestep: int =0, 
-    image_path: str =params.OUTPUT,
-):
-    '''
-    Visualizes model predictions on the CDDS dataset as an image and saves the result. The function 
-    searches from the passed starting time step the first non-empty RGB-time step in the EO data 
-    for visualization (SAR is usually available). Plots an output in the form: VV band from 
-    Sentinel-1, RGB image from Sentinel-2, label map, and in the second row the predicted 
-    probabilities of the model for each class as an image. 
-    '''
-
-    # encode predicted class as integer
-    pred_classes = torch.argmax(preds, dim=1)
-    # reshape to 2D
-    img_width=params.CDDS_IMG_WIDTH
-    label_img=label.reshape(img_width,img_width)
-    pred_img=pred_classes.reshape(img_width,img_width)
-
-    # search for non-empty timestep
-    eo_rgb_ts=eo_data[:,timestep, [4,2,3]]
-    while eo_data[:,timestep,[4,2,3]].sum()==0.0 and timestep<(params.CDDS_MAX_SEQ_LEN-1):
-        timestep +=1
-        eo_rgb_ts=eo_data[:,timestep, [4,2,3]]
-    eo_rgb_img=eo_rgb_ts.reshape(img_width,img_width, 3)
-
-    # to numpy array
-    pred_img=pred_img.detach().cpu().numpy() 
-    label_img = label_img.cpu().numpy() 
-    eo_rgb_img=eo_rgb_img.cpu().numpy()
-    eo_sar=eo_data[:, timestep, 0].reshape(img_width,img_width).cpu().numpy()
-    # predictions (logits) to probabilities
-    probs=torch.softmax(preds, dim=1).cpu().numpy()
-    
-    _, axs =plt.subplots(2,5, figsize=(15,5))
-    
-    # SAR, VV polarization
-    axs[0,0].imshow(eo_sar, cmap='magma')
-    axs[0,0].set_title('SAR VV')
-    axs[0,0].axis('off')
-
-    # show RGB image
-    axs[0,1].imshow(eo_rgb_img)
-    axs[0,1].set_title('RGB')
-    axs[0,1].axis('off')
-
-    # label
-    label_cmap=ListedColormap(params.CDDS_CLASS_COLORS)
-    # multi-class
-    axs[0,2].imshow(label_img, cmap=label_cmap, vmin=0, vmax=4)
-    axs[0,2].set_title('Label')
-    axs[0,2].axis('off')
-
-    # prediction
-    axs[0,3].imshow(pred_img, cmap=label_cmap, vmin=0, vmax=4)
-    axs[0,3].set_title('Prediction')
-    axs[0,3].axis('off')
-    axs[0,4].axis('off')
-
-    # get maximum of all probabilities -> colors values should refer to same range
-    max_prob=probs.max()
-    # iterate through dataset classes
-    for col in range(5):
-        # select probabilities for class
-        prob_pred= probs[:,col]
-        # reshape to 2D
-        prob_pred=prob_pred.reshape(img_width,img_width)
-        axs[1,col].imshow(prob_pred, cmap='gray', vmin=0, vmax=max_prob)
-        axs[1,col].set_title(f'Probability {col}')
-        axs[1,col].axis('off')
-
-    # save to image path
-    if not os.path.exists(image_path):
-        os.makedirs(image_path)
-    out_path=os.path.join(image_path, f'prediction_{title}.png')
-    plt.savefig(out_path, bbox_inches='tight')
-    plt.close()
-
 def visualize_prediction_pastis(
     eo_data: torch.Tensor, 
     preds:torch.Tensor, 
@@ -252,7 +170,7 @@ def visualize_prediction_pastis(
     plt.savefig(out_path, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
-def visualize_prediction_mtc(
+def visualize_prediction_mtcc(
     eo_data: torch.Tensor, 
     preds:torch.Tensor, 
     label:torch.Tensor, 
@@ -261,7 +179,7 @@ def visualize_prediction_mtc(
     image_path: str =params.OUTPUT,
     ):
     '''
-    Visualizes model predictions on the MTC dataset as an image and saves the result. 
+    Visualizes model predictions on the MTCC dataset as an image and saves the result. 
     Plots an output in the form: RGB-image from Sentinel-2 (for passed time step), 
     NDVI-band from Sentinel-1 (for passed time step), label map, model prediction. 
     '''
@@ -272,13 +190,13 @@ def visualize_prediction_mtc(
     # slice the image from flattened pixel array
     num_chan=eo_data.shape[-1]
     # reshape to 2D
-    img_width=params.MTC_IMG_WIDTH
+    img_width=params.MTCC_IMG_WIDTH
     label_img=label.reshape(img_width,img_width)
     pred_img=pred_classes.reshape(img_width,img_width)
 
     # search for non-empty timestep
     eo_rgb_tmp=eo_data[:,timestep]
-    while eo_data[:,timestep,[4,2,3]].sum()==0.0 and timestep<(params.CDDS_MAX_SEQ_LEN-1):
+    while eo_data[:,timestep,[4,2,3]].sum()==0.0 and timestep<(params.MTCC_MAX_SEQ_LEN-1):
         timestep +=1
         eo_rgb_tmp=eo_data[:,timestep]
     eo_img=eo_rgb_tmp.reshape(img_width,img_width, num_chan)
@@ -304,7 +222,7 @@ def visualize_prediction_mtc(
     axs[1].axis('off')
 
     # label
-    label_cmap=ListedColormap(params.MTC_CLASS_COLORS)
+    label_cmap=ListedColormap(params.MTCC_CLASS_COLORS)
     # multi-class
     axs[2].imshow(label_img, cmap=label_cmap, vmin=0, vmax=13, interpolation='nearest')
     axs[2].set_title('Label')
@@ -322,9 +240,9 @@ def visualize_prediction_mtc(
     plt.savefig(out_path, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
-def roc_auc_curve_mtc(prediction: NDArray[Any], label: NDArray[Any], image_path: str =params.OUTPUT,):
+def roc_auc_curve_mtcc(prediction: NDArray[Any], label: NDArray[Any], image_path: str =params.OUTPUT,):
     '''
-    Plots multi-class AUC-ROC curves (for each class individually) for MTC 
+    Plots multi-class AUC-ROC curves (for each class individually) for MTCC 
     dataset for raw predictions and labels in shape (batch size, number of 
     channels) and saves it to passed directory path.
     '''
@@ -334,7 +252,7 @@ def roc_auc_curve_mtc(prediction: NDArray[Any], label: NDArray[Any], image_path:
     # (Natural Vegetation=1, Corn=3, Soybeans=4, Cotton=11, Open Water=7, Sorghum=12)
     classes_display=[1,3,4,11,7,12]
     # Get corresponding colors
-    label_colors=[params.MTC_CLASS_COLORS[class_id] for class_id in classes_display] 
+    label_colors=[params.MTCC_CLASS_COLORS[class_id] for class_id in classes_display] 
 
     # iterate through classes and class-colors
     for class_id, color in zip(classes_display, label_colors):
@@ -345,7 +263,7 @@ def roc_auc_curve_mtc(prediction: NDArray[Any], label: NDArray[Any], image_path:
         RocCurveDisplay.from_predictions(
             label_class, 
             predicted_class,
-            name=params.MTC_LABELS_INV[class_id],
+            name=params.MTCC_LABELS_INV[class_id],
             color=color,
             ax=ax,
             # chance level at last
@@ -361,45 +279,7 @@ def roc_auc_curve_mtc(prediction: NDArray[Any], label: NDArray[Any], image_path:
     # save figure
     if not os.path.exists(image_path):
         os.makedirs(image_path)
-    out_path=os.path.join(image_path, 'MTC_ROC_AUC.png')
-    plt.savefig(out_path, bbox_inches='tight')
-    plt.close(fig)
-
-def roc_auc_curve_cdds(prediction: NDArray[Any], label: NDArray[Any], image_path: str =params.OUTPUT,):
-    '''
-    Plots multi-class AUC-ROC curves (for each class individually) for CDDS 
-    dataset for raw predictions and labels in shape (batch size, number of 
-    channels) and saves it to passed directory path.
-    '''
-
-    fig, ax = plt.subplots(figsize=(6, 6))
-
-    # iterate through classes and class-colors
-    for class_id, color in zip(range(5), params.CDDS_CLASS_COLORS):
-        # get label for class
-        label_class = (label==class_id).astype(int)
-        # prediction for class
-        predicted_class=prediction[:,class_id]
-        RocCurveDisplay.from_predictions(
-            label_class, 
-            predicted_class,
-            name=params.CDDS_LABELS_INV[class_id],
-            color=color,
-            ax=ax,
-            # chance level at last
-            plot_chance_level=(class_id == 4),
-        )
-    ax.set_xlabel('False positive rate', fontsize=14)
-    ax.set_ylabel('True positive rate',fontsize=14)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.tick_params(axis='both', labelsize=12)
-    ax.legend(loc='lower right', fontsize=14)
-
-    # save figure
-    if not os.path.exists(image_path):
-        os.makedirs(image_path)
-    out_path=os.path.join(image_path, 'CDDS_ROC_AUC.png')
+    out_path=os.path.join(image_path, 'MTCC_ROC_AUC.png')
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
 

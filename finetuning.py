@@ -46,7 +46,7 @@ class FineTuning:
     '''
 
     def __init__(self, vis_field_size, dataset):
-        self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'MTC'
+        self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'MTCC'
         self.logger = logging.getLogger('default')
         self.vis_field_size = vis_field_size
         self.model_type = 'att'
@@ -126,47 +126,47 @@ class FineTuning:
             lambda_1=params.P_LAMBDA_1
             lambda_2=params.P_LAMBDA_2
 
-        # MTC branch
-        elif self.dataset == 'MTC':
+        # MTCC branch
+        elif self.dataset == 'MTCC':
             # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
-            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size, dropout=params.MTC_DROPOUT).to(params.DEVICE)
+            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size, dropout=params.MTCC_DROPOUT).to(params.DEVICE)
             # construct the fine-tunig model from the pretrained model
             model = pretrained_model.construct_finetuning_model(
-                num_outputs=params.MTC_NUM_OUTPUTS,
+                num_outputs=params.MTCC_NUM_OUTPUTS,
                 vis_field_size=self.vis_field_size,
-                img_width=params.MTC_IMG_WIDTH,
+                img_width=params.MTCC_IMG_WIDTH,
             ).to(params.DEVICE)
             # training dataset
-            train_ds = multitempcrop_dataset.MultiTempCrop(split='train',max_length=params.FT_NUM_TRAIN_SAMPLES,shuffle=True)
+            train_ds = multitempcrop_dataset.MultiTempCropClass(split='train',max_length=params.FT_NUM_TRAIN_SAMPLES,shuffle=True)
             # validation dataset
-            val_ds = multitempcrop_dataset.MultiTempCrop(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
+            val_ds = multitempcrop_dataset.MultiTempCropClass(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
             # test dataset
-            test_ds = multitempcrop_dataset.MultiTempCrop(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
+            test_ds = multitempcrop_dataset.MultiTempCropClass(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
             # training params
-            self.total_pixels = params.MTC_NUM_PIXELS
-            batch_size=params.MTC_BATCH_SIZE
-            self.epochs = params.MTC_MAX_EPOCHS
-            self.max_learning_rate = params.MTC_MAX_LR
-            self.min_learning_rate = params.MTC_MIN_LR
-            weight_decay=params.MTC_WEIGHT_DECAY
-            vis_method=utils.visualize_prediction_mtc
-            self.label_list = params.MTC_CLASSES
+            self.total_pixels = params.MTCC_NUM_PIXELS
+            batch_size=params.MTCC_BATCH_SIZE
+            self.epochs = params.MTCC_MAX_EPOCHS
+            self.max_learning_rate = params.MTCC_MAX_LR
+            self.min_learning_rate = params.MTCC_MIN_LR
+            weight_decay=params.MTCC_WEIGHT_DECAY
+            vis_method=utils.visualize_prediction_mtcc
+            self.label_list = params.MTCC_CLASSES
             # CE params
-            weight = params.MTC_WEIGHTS.to(params.DEVICE)
-            label_smoothing=params.MTC_CE_LABEL_SMOOTHING
+            weight = params.MTCC_WEIGHTS.to(params.DEVICE)
+            label_smoothing=params.MTCC_CE_LABEL_SMOOTHING
             # default
             ignore_index=0
             # FTL params
-            classes=params.MTC_CLASSES
+            classes=params.MTCC_CLASSES
             from_logits=True
-            alpha=params.MTC_TVERSKY_ALPHA
-            beta=params.MTC_TVERSKY_BETA
-            gamma=params.MTC_TVERSKY_GAMMA
+            alpha=params.MTCC_TVERSKY_ALPHA
+            beta=params.MTCC_TVERSKY_BETA
+            gamma=params.MTCC_TVERSKY_GAMMA
             eps=1e-4
             mode='multiclass'
             # combined loss params
-            lambda_1=params.MTC_LAMBDA_1
-            lambda_2=params.MTC_LAMBDA_2
+            lambda_1=params.MTCC_LAMBDA_1
+            lambda_2=params.MTCC_LAMBDA_2
         
         # unknown dataset
         else:
@@ -442,7 +442,7 @@ class FineTuning:
             label_np = label_np[void_mask]
             # delete column label 19 from raw predictions
             raw_pred = raw_pred[:, :-1]
-        # ignore 'No Data' label in MTC
+        # ignore 'No Data' label in MTCC
         else:
             # mask class 19 instances
             void_mask = label_np != 0
@@ -462,7 +462,7 @@ class FineTuning:
         if self.dataset == 'PASTIS-R':
             utils.roc_auc_curve_pastis(prob_pred, label_np, image_path=self.image_path)
         else:
-            utils.roc_auc_curve_mtc(prob_pred, label_np, image_path=self.image_path)
+            utils.roc_auc_curve_mtcc(prob_pred, label_np, image_path=self.image_path)
 
         # metrics: average macro -> simple average for imbalanced datasets
         metrics = {
