@@ -447,7 +447,7 @@ class FineTuning:
             raw_pred = raw_pred[:, :-1]
         # ignore 'No Data' label in MTCC
         else:
-            # mask class 19 instances
+            # mask class 0 instances
             void_mask = label_np != 0
             label_np = label_np[void_mask]
             # delete column label 19 from raw predictions
@@ -458,8 +458,11 @@ class FineTuning:
 
         # logit predictions to probabilities
         prob_pred = torch.softmax(raw_pred, dim=1).cpu().numpy()[void_mask]
-        # class predictions
-        prediction = np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask]
+        # class predictions, for MTCC compensate for off by 1
+        prediction = np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask] if self.dataset == 'PASTIS-R' else  np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask] +1
+
+        # is off by one for MTCC
+        
 
         # get values for ROC-AUC visualization
         if self.dataset == 'PASTIS-R':
