@@ -26,7 +26,7 @@ How to use pretraining and fine-tuning:
         5) The model is cached automatically in the directory "output/cache", where it is saved as a
         dictionary containing the training progress.
 
-        MTC dataset:
+        MTCC dataset:
 
 
 Credits: 

@@ -89,23 +89,21 @@ class Attention(nn.Module):
                 if zero_rows.any():
                     # set the first element per zero row True
                     attn_mask[zero_rows, 0] = True
-                else:
-                    attn_mask = attn_mask
+
+                # attention
+                x = F.scaled_dot_product_attention(
+                    q,
+                    k,
+                    v,
+                    # False indicates that the element should take part in attention
+                    attn_mask=attn_mask,
+                    dropout_p=self.attn_drop.p,
+                )
                 # set 0-rows 0 again
                 if zero_rows.any():
                     x[zero_rows] = 0.0
-
-            # attention
-            x = F.scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                # False indicates that the element should take part in attention
-                attn_mask=attn_mask,
-                dropout_p=self.attn_drop.p,
-            )
-            # reshape (B*num_heads, N, head_dim) -> (B, num_heads, N, head_dim)
-            x=x.reshape(B, self.num_heads, N, self.head_dim)
+                # reshape (B*num_heads, N, head_dim) -> (B, num_heads, N, head_dim)
+                x=x.reshape(B, self.num_heads, N, self.head_dim)
         else:
             # fallback option -> no attention mask implemented
             if attn_mask is not None:

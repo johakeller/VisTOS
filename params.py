@@ -13,7 +13,7 @@ import torch
 ####################################################################### GENERAL ################################################################################################
 
 # environment used: ['colab', 'cluster',''cluster_portia','local', 'hpc']
-environment_= 'local'
+environment_= 'hpc'
 # general paths
 OUTPUT = './output' # output folder
 # define cache directory
