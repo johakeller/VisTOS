@@ -138,11 +138,11 @@ class FineTuning:
                 img_width=params.MTCC_IMG_WIDTH,
             ).to(params.DEVICE)
             # training dataset
-            train_ds = multitempcrop_dataset.MultiTempCropClass(split='train',max_length=params.FT_NUM_TRAIN_SAMPLES,shuffle=True)
+            train_ds = multitempcrop_dataset.MultiTempCropClass(split='train',shuffle=True)
             # validation dataset
-            val_ds = multitempcrop_dataset.MultiTempCropClass(split='validation',max_length=params.FT_NUM_VAL_SAMPLES,shuffle=True)
+            val_ds = multitempcrop_dataset.MultiTempCropClass(split='validation',shuffle=True)
             # test dataset
-            test_ds = multitempcrop_dataset.MultiTempCropClass(split='test',max_length=params.FT_NUM_TEST_SAMPLES,shuffle=True)
+            test_ds = multitempcrop_dataset.MultiTempCropClass(split='test',shuffle=True)
             # training params
             self.total_pixels = params.MTCC_NUM_PIXELS
             batch_size=params.MTCC_BATCH_SIZE

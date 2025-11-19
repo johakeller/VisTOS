@@ -29,7 +29,6 @@ class MultiTempCropClass(IterableDataset):
         self, 
         split='train', 
         batch_size=params.MTCC_BATCH_SIZE, 
-        max_length=params.MTCC_MAX_LEN, 
         shuffle=False, 
         seed=123
     ):      
@@ -78,8 +77,6 @@ class MultiTempCropClass(IterableDataset):
         # number of samples (images) used
         self.num_samples=len(self.sample_idx)
         self.data_length=self.num_samples*params.MTCC_NUM_PIXELS
-        # list of sample indices used
-        self.sample_idx=self.sample_idx[:1] 
         # get number of original pre-training input bands
         self.num_bands= sum(values['length'] for values in params.CHANNEL_GROUPS.values()) # exclude DW, include B9
 
