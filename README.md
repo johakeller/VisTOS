@@ -22,15 +22,16 @@
 #### PASTIS-R dataset:
 ![VisTOS Overview](docs/images/pastisr_prediction_test_1.png)
 *VisTOS visual field size 5 prediction on PASTIS-R dataset image (one time step).*
-1)  Obtain the PASTIS-R dataset from: https://zenodo.org/records/5735646, change the constant
-P_PATH in params accordingly. 
-2)  The class weights for inverse frequency weighting can be started by uncommenting the main() call at the end of the pastis_dataset file. Start calculation then via: 
-$ python -m dataset.pastis_dataset
-3)  The pretrained model must reside in "output" as a .pth file following the pretraining naming conventions, with the same model type and the same visual field size you want to train. Otherwise a previously fine-tuned cached model is preferably loaded from "output/cache" if available. 
-4) Start the fine-tuning, after defining the corresponding parameters in params, with:
-$ python main.py [model_type] finetune pastis [visual_field_size]. The parameter model_type can be "att" for the attention-based spatial encoding model or "conv" for the convolution-based spatial encoding model, the parameter "visual_field_size" must be defined and can be 1 (for Presto), 3 for a 3x3-pixel visual field, and 5 for a 5x5-pixel visual field in combination with the attention-based architecture ("att") and 3, 5, and 7 for a 7x7-pixel visual field for the convolution-based architecture ("conv").
-5) The model is cached automatically in the directory "output/cache", where it is saved as a
-dictionary containing the training progress.
+1.  Obtain the **PASTIS-R** dataset from: https://zenodo.org/records/5735646, change the constant
+    `P_PATH` in `params` accordingly. 
+2.  The pretrained model must reside in `output` as a .pth file following the pretraining naming conventions, with the same model type and the same visual field size you want to train. Otherwise a previously
+    fine-tuned cached model is preferably loaded from `output/cache` if available. 
+3.  Start the fine-tuning, after defining the corresponding parameters in `params`, with:
+    ```bash
+    python main.py [model_type] finetune pastis [visual_field_size]
+    ```
+    The parameter `model_type` can be `att` for the **attention-based spatial encoding model** or `conv` for the **convolution-based spatial encoding model**, the parameter `visual_field_size` must be defined and can be 1 (for Presto), 3 for a 3x3-pixel visual field, and 5 for a 5x5-pixel visual field in combination with the attention-based architecture (`att`) and 3, 5, and 7 for a 7x7-pixel visual field for the convolution-based architecture (`conv`).
+4.  The model is cached automatically in the directory `output/cache`, where it is saved as a dictionary containing the training progress.
 
 #### MTCC dataset:
 ![VisTOS Overview](docs/images/mtcc_prediction_test_1.png)
