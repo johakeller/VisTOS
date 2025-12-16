@@ -41,7 +41,7 @@
     fine-tuned cached model is preferably loaded from `output/cache` if available. 
 4.  Start the fine-tuning, after defining the corresponding parameters in `params`, with:
     ```bash
-    $ python main.py [model_type] finetune pastis [visual_field_size]
+    python main.py [model_type] finetune mtcc [visual_field_size]
     ```
     The parameter `model_type` can be `att` for the **attention-based spatial encoding model** or `conv` for the **convolution-based spatial encoding model**, the parameter `visual_field_size` must be defined and can be 1 (for Presto), 3 for a 3x3-pixel visual field, and 5 for a 5x5-pixel visual field in combination with the attention-based architecture (`att`) and 3, 5, and 7 for a 7x7-pixel visual field for the convolution-based architecture (`conv`).
 4.  The model is cached automatically in the directory `output/cache`, where it is saved as a dictionary containing the training progress.
