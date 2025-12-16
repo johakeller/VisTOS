@@ -1,6 +1,7 @@
 # VisTOS – Visual Fields for Lightweight Time Series Transformers in Earth Observation Semantic Segmentation
 **Johannnes Keller**
 ![VisTOS Overview](docs/images/attention_architecture.png)
+*Figure 1: Attention-based VisTOS downstream-task architecture.*
 ## How to use pretraining and fine-tuning:
 
 ### Pretraining:    
