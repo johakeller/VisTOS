@@ -1,8 +1,8 @@
-'''
+"""
 Module to initiate fine-tuning. The entry-point is init_finetuning() of the class FineTuning.
 Standard fine-tuning includes training and subsequent evaluation, but an already trained
 model can also directly be evaluated.
-'''
+"""
 
 import logging
 import math
@@ -31,64 +31,71 @@ import utils
 from dataset import multitempcrop_dataset, pastis_r_dataset
 from model import vistos_att_model
 
-# set scaler for mixed precision training 
+# set scaler for mixed precision training
 scaler = torch.GradScaler(enabled=torch.cuda.is_available())
 
+
 class FineTuning:
-    '''
+    """
     This class conducts fine-tuning with the entry point init_finetuning(). Fine-tuning
-    includes training, validation and testing of a pretrained model. Uses early 
-    stopping for training. During testing several evaluation metrics are applied 
-    and saved to output file. Also visualizations of predictions and image 
-    samples are saved during testing using the utils module. Can also run 
-    evaluation directly without preceding training. Trained models are saved 
-    in the model cache in the output directory and automatically loaded from there. 
-    '''
+    includes training, validation and testing of a pretrained model. Uses early
+    stopping for training. During testing several evaluation metrics are applied
+    and saved to output file. Also visualizations of predictions and image
+    samples are saved during testing using the utils module. Can also run
+    evaluation directly without preceding training. Trained models are saved
+    in the model cache in the output directory and automatically loaded from there.
+    """
 
     def __init__(self, vis_field_size, dataset):
-        self.dataset = 'PASTIS-R' if dataset == 'pastis' else 'MTCC'
-        self.logger = logging.getLogger('default')
+        self.dataset = "PASTIS-R" if dataset == "pastis" else "MTCC"
+        self.logger = logging.getLogger("default")
         self.vis_field_size = vis_field_size
-        self.model_type = 'att'
-        self.image_path= ''
+        self.model_type = "att"
+        self.image_path = ""
         self.warmup_epochs = params.FT_WARMUP
-        self.min_learning_rate=params.FT_MIN_LR
+        self.min_learning_rate = params.FT_MIN_LR
 
     def init_finetuning(
-        self, 
-        pretrained_model, 
-        checkpointing=True, 
-        eval_mode=False, 
-        model_type='att',
+        self,
+        pretrained_model,
+        checkpointing=True,
+        eval_mode=False,
+        model_type="att",
         model_class=vistos_att_model,
         vis_field_size=params.VIS_FIELDS[0],
     ):
-        '''
-        Start of the finetuning logic for fine-tuning of semantic segmentation. Initializes the 
+        """
+        Start of the finetuning logic for fine-tuning of semantic segmentation. Initializes the
         logger, tries to load a model from cache first, if cache is empty, starts fine-tuning from
-        scratch (loads pretrained model from output directory). Initializes dataset-objects, 
-        dataloaders and starts fine-tuning followed by evaluation. If argument eval_mode passed, 
+        scratch (loads pretrained model from output directory). Initializes dataset-objects,
+        dataloaders and starts fine-tuning followed by evaluation. If argument eval_mode passed,
         directly jumps into evaluation. Method has two separate branches: one for PASTIS-R dataset
         and the other for the BraDD-S1TS dataset. The method can handle two types of models, the VisTOS VF
-        model with attention-based spatial enoding and the VisTOS CVF model with convolutional 
-        spatial encoding. The type is passed via model_type argument. Cache-loading behavior is 
+        model with attention-based spatial enoding and the VisTOS CVF model with convolutional
+        spatial encoding. The type is passed via model_type argument. Cache-loading behavior is
         defined via checkpointing argument.
-        '''
+        """
         # init logger
-        self.logger = utils.init_logger(name=f'finetuning_{self.dataset}_{model_type}_vf{self.vis_field_size}')
+        self.logger = utils.init_logger(
+            name=f"finetuning_{self.dataset}_{model_type}_vf{self.vis_field_size}"
+        )
         # set start epoch, start iteration, previous loss to 0
         epoch = 0
         iteration = 0
         loss = 0
         # set model type and image path
         self.model_type = model_type
-        self.image_path = os.path.join(params.OUTPUT, f'{model_type}_{self.vis_field_size}_{self.dataset}_images')
+        self.image_path = os.path.join(
+            params.OUTPUT, f"{model_type}_{self.vis_field_size}_{self.dataset}_images"
+        )
 
         # PASTIS-R branch
-        if self.dataset == 'PASTIS-R':
+        if self.dataset == "PASTIS-R":
             # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
-            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size, dropout=params.P_DROPOUT).to(params.DEVICE)
-        
+            pretrained_model = model_class.VistosTimeSeriesSeq2Seq.load_pretrained(
+                vis_field_size=vis_field_size, dropout=params.P_DROPOUT
+            ).to(params.DEVICE)
+
             # construct the fine-tunig model from the pre-trained model
             model = pretrained_model.construct_finetuning_model(
                 num_outputs=params.P_NUM_OUTPUTS,
@@ -96,41 +103,49 @@ class FineTuning:
                 img_width=params.P_IMG_WIDTH,
             ).to(params.DEVICE)
             # training dataset
-            train_ds = pastis_r_dataset.PastisRDataset(split='train', max_length=params.FT_NUM_TRAIN_SAMPLES, shuffle=True)
+            train_ds = pastis_r_dataset.PastisRDataset(
+                split="train", max_length=params.FT_NUM_TRAIN_SAMPLES, shuffle=True
+            )
             # validation dataset
-            val_ds = pastis_r_dataset.PastisRDataset(split='validation', max_length=params.FT_NUM_VAL_SAMPLES, shuffle=True)
+            val_ds = pastis_r_dataset.PastisRDataset(
+                split="validation", max_length=params.FT_NUM_VAL_SAMPLES, shuffle=True
+            )
             # test dataset
-            test_ds = pastis_r_dataset.PastisRDataset(split='test', max_length=params.FT_NUM_TEST_SAMPLES, shuffle=True)
+            test_ds = pastis_r_dataset.PastisRDataset(
+                split="test", max_length=params.FT_NUM_TEST_SAMPLES, shuffle=True
+            )
             # training params
             self.total_pixels = params.P_NUM_PIXELS
-            batch_size=params.P_BATCH_SIZE
+            batch_size = params.P_BATCH_SIZE
             self.epochs = params.P_MAX_EPOCHS
             self.max_learning_rate = params.P_MAX_LR
             self.min_learning_rate = params.P_MIN_LR
-            weight_decay=params.P_WEIGHT_DECAY
-            vis_method=utils.visualize_prediction_pastis
+            weight_decay = params.P_WEIGHT_DECAY
+            vis_method = utils.visualize_prediction_pastis
             # exclude Void class
             self.label_list = list(range(19))
             # FTL params
-            classes=params.P_TVERSKY_CLASSES
-            from_logits=True
-            alpha=params.P_TVERSKY_ALPHA
-            beta=params.P_TVERSKY_BETA
-            gamma=params.P_TVERSKY_GAMMA
-            eps=1e-4
-            mode='multiclass'
+            classes = params.P_TVERSKY_CLASSES
+            from_logits = True
+            alpha = params.P_TVERSKY_ALPHA
+            beta = params.P_TVERSKY_BETA
+            gamma = params.P_TVERSKY_GAMMA
+            eps = 1e-4
+            mode = "multiclass"
             # CE params
-            ignore_index=19
-            label_smoothing=0.1
-            weight=(params.P_WEIGHTS.to(params.DEVICE))**params.P_DELTA
+            ignore_index = 19
+            label_smoothing = 0.1
+            weight = (params.P_WEIGHTS.to(params.DEVICE)) ** params.P_DELTA
             # combined loss params
-            lambda_1=params.P_LAMBDA_1
-            lambda_2=params.P_LAMBDA_2
+            lambda_1 = params.P_LAMBDA_1
+            lambda_2 = params.P_LAMBDA_2
 
         # MTCC branch
-        elif self.dataset == 'MTCC':
+        elif self.dataset == "MTCC":
             # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
-            pretrained_model=model_class.VistosTimeSeriesSeq2Seq.load_pretrained(vis_field_size=vis_field_size, dropout=params.MTCC_DROPOUT).to(params.DEVICE)
+            pretrained_model = model_class.VistosTimeSeriesSeq2Seq.load_pretrained(
+                vis_field_size=vis_field_size, dropout=params.MTCC_DROPOUT
+            ).to(params.DEVICE)
             # construct the fine-tunig model from the pretrained model
             model = pretrained_model.construct_finetuning_model(
                 num_outputs=params.MTCC_NUM_OUTPUTS,
@@ -138,46 +153,52 @@ class FineTuning:
                 img_width=params.MTCC_IMG_WIDTH,
             ).to(params.DEVICE)
             # training dataset
-            train_ds = multitempcrop_dataset.MultiTempCropClass(split='train',shuffle=True)
+            train_ds = multitempcrop_dataset.MultiTempCropClass(
+                split="train", shuffle=True
+            )
             # validation dataset
-            val_ds = multitempcrop_dataset.MultiTempCropClass(split='validation',shuffle=True)
+            val_ds = multitempcrop_dataset.MultiTempCropClass(
+                split="validation", shuffle=True
+            )
             # test dataset
-            test_ds = multitempcrop_dataset.MultiTempCropClass(split='test',shuffle=True)
+            test_ds = multitempcrop_dataset.MultiTempCropClass(
+                split="test", shuffle=True
+            )
             # training params
             self.total_pixels = params.MTCC_NUM_PIXELS
-            batch_size=params.MTCC_BATCH_SIZE
+            batch_size = params.MTCC_BATCH_SIZE
             self.epochs = params.MTCC_MAX_EPOCHS
             self.max_learning_rate = params.MTCC_MAX_LR
             self.min_learning_rate = params.MTCC_MIN_LR
-            weight_decay=params.MTCC_WEIGHT_DECAY
-            vis_method=utils.visualize_prediction_mtcc
+            weight_decay = params.MTCC_WEIGHT_DECAY
+            vis_method = utils.visualize_prediction_mtcc
             # exclude No Data class
-            self.label_list = list(range(1,14))
+            self.label_list = list(range(1, 14))
             # CE params
             weight = params.MTCC_WEIGHTS.to(params.DEVICE)
-            label_smoothing=params.MTCC_CE_LABEL_SMOOTHING
+            label_smoothing = params.MTCC_CE_LABEL_SMOOTHING
             # default
-            ignore_index=0
+            ignore_index = 0
             # FTL params
-            classes=params.MTCC_CLASSES
-            from_logits=True
-            alpha=params.MTCC_TVERSKY_ALPHA
-            beta=params.MTCC_TVERSKY_BETA
-            gamma=params.MTCC_TVERSKY_GAMMA
-            eps=1e-4
-            mode='multiclass'
+            classes = params.MTCC_CLASSES
+            from_logits = True
+            alpha = params.MTCC_TVERSKY_ALPHA
+            beta = params.MTCC_TVERSKY_BETA
+            gamma = params.MTCC_TVERSKY_GAMMA
+            eps = 1e-4
+            mode = "multiclass"
             # combined loss params
-            lambda_1=params.MTCC_LAMBDA_1
-            lambda_2=params.MTCC_LAMBDA_2
-        
+            lambda_1 = params.MTCC_LAMBDA_1
+            lambda_2 = params.MTCC_LAMBDA_2
+
         # unknown dataset
         else:
-            raise ValueError(f'Dataset {self.dataset} unknown.')
-        
+            raise ValueError(f"Dataset {self.dataset} unknown.")
+
         # print and log info
         message = (
             f'\rFine-tuning VisTOS {"VF size" if model_type == "att" else "CVF size"} {self.vis_field_size} on {self.dataset}, '
-            f'batch size {batch_size}, '
+            f"batch size {batch_size}, "
             f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
         )
         print(message)
@@ -196,9 +217,9 @@ class FineTuning:
         # CE for foreground/background separation and stability
         loss_2 = nn.CrossEntropyLoss(
             weight=weight,
-            label_smoothing=label_smoothing, 
-            ignore_index=ignore_index, 
-            reduction='mean'
+            label_smoothing=label_smoothing,
+            ignore_index=ignore_index,
+            reduction="mean",
         )
 
         # define optimizer
@@ -211,11 +232,7 @@ class FineTuning:
         # try loading a model from cache if available
         if checkpointing:
             model, optimizer, epoch, iteration, loss = self.load_checkpoint(
-                model, 
-                optimizer, 
-                epoch, 
-                iteration, 
-                loss
+                model, optimizer, epoch, iteration, loss
             )
         # dataloaders: training dataloader
         train_dl = DataLoader(
@@ -255,28 +272,28 @@ class FineTuning:
                 lambda_2=lambda_2,
             )
         # test fine-tuned model (directly accessed with eval_mode)
-        results_dict = self.evaluate(model, test_dl, vis_method=vis_method)        
+        results_dict = self.evaluate(model, test_dl, vis_method=vis_method)
         # log multi-class metrics dictionary content to ouput
-        self.logger.info('Test metrics:')
+        self.logger.info("Test metrics:")
         for metric, result in results_dict.items():
             # don't round dictionaries of metrics or confusion matrix
-            if metric == 'confusion_matrix' or isinstance(result, dict):
-                self.logger.info('%s: %s', metric, result)
+            if metric == "confusion_matrix" or isinstance(result, dict):
+                self.logger.info("%s: %s", metric, result)
             else:
-                self.logger.info('%s: %.3f', metric, result)
+                self.logger.info("%s: %.3f", metric, result)
 
     @staticmethod
     def adjust_learning_rate(
-        optimizer, 
-        epoch, 
-        warmup_epochs, 
-        total_epochs, 
-        max_lr, 
+        optimizer,
+        epoch,
+        warmup_epochs,
+        total_epochs,
+        max_lr,
         min_lr,
     ):
-        '''
+        """
         Decays the learning rate with half-cycle cosine after warmup.
-        '''
+        """
         if epoch < warmup_epochs:
             # starts at min_lr
             lr = min_lr + ((max_lr - min_lr) * epoch / warmup_epochs)
@@ -288,48 +305,49 @@ class FineTuning:
                 )
             )
         for param_group in optimizer.param_groups:
-            if 'lr_scale' in param_group:
+            if "lr_scale" in param_group:
                 # This is only used during finetuning
-                param_group['lr'] = lr * param_group['lr_scale']
+                param_group["lr"] = lr * param_group["lr_scale"]
             else:
-                param_group['lr'] = lr
+                param_group["lr"] = lr
         return lr
 
-    def compound_loss(
-        self,
-        loss_1,
-        loss_2,
-        lambda_1,
-        lambda_2
-    ):
-        '''
+    def compound_loss(self, loss_1, loss_2, lambda_1, lambda_2):
+        """
         Computes weighted compound loss of fine-tuning head:
         Loss_total = lambda_1*Loss_binary +lambda_2*Loss_CE.
-        '''
+        """
 
         return (lambda_1 * loss_1) + (lambda_2 * loss_2)
 
     def load_checkpoint(
-        self, 
-        model, 
-        optimizer, 
-        epoch, 
-        iteration, 
+        self,
+        model,
+        optimizer,
+        epoch,
+        iteration,
         loss,
     ):
-        '''
+        """
         Loads a model from model checkpoint if one is available. Reproduces
-        and returns cached model, optimizer, iteration, epoch, and loss 
-        calculated so far. 
-        '''
+        and returns cached model, optimizer, iteration, epoch, and loss
+        calculated so far.
+        """
 
         try:
-            # try to fetch list of saved model checkpoints: check for model type 
+            # try to fetch list of saved model checkpoints: check for model type
             # (attention/convolution) and correct visual field size
-            old_checkpoints = [file for file in os.listdir(params.CACHE) if f'{self.model_type}_model_ft_{self.vis_field_size}' in file]
+            old_checkpoints = [
+                file
+                for file in os.listdir(params.CACHE)
+                if f"{self.model_type}_model_ft_{self.vis_field_size}" in file
+            ]
             # if more than on suitable model found
             if len(old_checkpoints) > 1:
-                print(f'\rMore than one checkpoint available, loading last checkpoint: {old_checkpoints[-1]}.{params.EOL_SPACE}',end='')
+                print(
+                    f"\rMore than one checkpoint available, loading last checkpoint: {old_checkpoints[-1]}.{params.EOL_SPACE}",
+                    end="",
+                )
                 # fetch the last saved model
                 old_checkpoint = old_checkpoints[-1]
             # only one model in list
@@ -342,55 +360,65 @@ class FineTuning:
                 map_location=params.DEVICE,
             )
             # update model
-            model.load_state_dict(model_checkpoint['model'])
+            model.load_state_dict(model_checkpoint["model"])
             # update optimizer
-            optimizer.load_state_dict(model_checkpoint['optimizer'])
+            optimizer.load_state_dict(model_checkpoint["optimizer"])
             # update training epoch
-            epoch = model_checkpoint['epoch']
+            epoch = model_checkpoint["epoch"]
             # update training iteration
-            iteration = model_checkpoint['iteration']
+            iteration = model_checkpoint["iteration"]
             # introduced after training of some models
-            loss = model_checkpoint.get('loss', 0.0)
+            loss = model_checkpoint.get("loss", 0.0)
         # cache is empty
         except IndexError:
-            print(f'\rNo checkpoint found, starting from scratch.{params.EOL_SPACE}',end='')
+            print(
+                f"\rNo checkpoint found, starting from scratch.{params.EOL_SPACE}",
+                end="",
+            )
         # return cached model and training state
         return model.to(params.DEVICE), optimizer, epoch, iteration, loss
 
     def update_checkpoint(
-        self, 
-        model, 
-        optimizer, 
-        epoch, 
-        iteration, 
+        self,
+        model,
+        optimizer,
+        epoch,
+        iteration,
         loss,
     ):
-        '''
+        """
         Saves current state of model and optimizer to checkpoint, removes old
         checkpoints.
-        '''
+        """
         # current state of training to dictionary: epoch, iteration, model, optimizer, loss
         model_dict = {
-            'epoch': epoch,
-            'iteration': iteration,
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'loss': loss,
+            "epoch": epoch,
+            "iteration": iteration,
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "loss": loss,
         }
 
         # remove old checkpoint with same visual field size and same model type
-        old_checkpoints = [check_point for check_point in os.listdir(params.CACHE) if f'{self.model_type}_model_ft_{self.vis_field_size}' in check_point]
+        old_checkpoints = [
+            check_point
+            for check_point in os.listdir(params.CACHE)
+            if f"{self.model_type}_model_ft_{self.vis_field_size}" in check_point
+        ]
         for file in old_checkpoints:
             os.remove(os.path.join(params.CACHE, file))
 
         # save new checkpoint
-        model_path=os.path.join(params.CACHE, f'{self.model_type}_model_ft_{self.vis_field_size}_{datetime.now().strftime("%m_%d_%H")}.pth')
-        torch.save(model_dict,model_path)
+        model_path = os.path.join(
+            params.CACHE,
+            f'{self.model_type}_model_ft_{self.vis_field_size}_{datetime.now().strftime("%m_%d_%H")}.pth',
+        )
+        torch.save(model_dict, model_path)
 
     def count_params(self, model):
-        '''
+        """
         Method to count the number of trainable parameters in the model.
-        '''
+        """
 
         # define params to exclude from count
         # Presto: exclude attention-based visual field form counting
@@ -410,15 +438,15 @@ class FineTuning:
                 continue
             # if not continued, count param
             params_sum += param.numel()
-        # print output only 
-        print(f'\nTrainable params: {params_sum}.')
+        # print output only
+        print(f"\nTrainable params: {params_sum}.")
 
     @staticmethod
     def class_confidence(labels_true, prob_pred, labels, offset=0):
-        '''
+        """
         Calculates average confidences for positive instances of a label and returns a dictionary:
         label (int): confidence (float).
-        '''
+        """
 
         conf_dict = {}
 
@@ -426,20 +454,20 @@ class FineTuning:
             # mask for true instances for class label
             true_mask = labels_true == label
             # mean over label true instances
-            conf_dict[label] = prob_pred[true_mask, label-offset].mean()
+            conf_dict[label] = prob_pred[true_mask, label - offset].mean()
         return conf_dict
 
     def compute_metrics(self, raw_pred, label):
-        '''
-        Computes various metrics given prediction logit tensors and label tensors and returns 
+        """
+        Computes various metrics given prediction logit tensors and label tensors and returns
         them in a dictionary for further averaging. Also calls the AUC-ROC curve function from
         module utils, which visualizes ROC-curves individually for PASTIS-R and BraDD-S1TS.
-        '''
+        """
 
         # label to numpy
         label_np = label.cpu().numpy().ravel()
         # ignore void label in PASTIS-R
-        if self.dataset == 'PASTIS-R':
+        if self.dataset == "PASTIS-R":
             # mask class 19 instances
             void_mask = label_np != 19
             label_np = label_np[void_mask]
@@ -451,7 +479,7 @@ class FineTuning:
             void_mask = label_np != 0
             label_np = label_np[void_mask]
             # delete column label 19 from raw predictions
-            raw_pred = raw_pred[:,1 :]
+            raw_pred = raw_pred[:, 1:]
 
         # remove possible NaNs
         raw_pred = torch.nan_to_num(raw_pred, nan=0.0, posinf=1000, neginf=-1000)
@@ -459,39 +487,68 @@ class FineTuning:
         # logit predictions to probabilities
         prob_pred = torch.softmax(raw_pred, dim=1).cpu().numpy()[void_mask]
         # class predictions, for MTCC compensate for off by 1
-        prediction = np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask] if self.dataset == 'PASTIS-R' else  np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask] +1
+        prediction = (
+            np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask]
+            if self.dataset == "PASTIS-R"
+            else np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask] + 1
+        )
 
         # is off by one for MTCC
-        
 
         # get values for ROC-AUC visualization
-        if self.dataset == 'PASTIS-R':
+        if self.dataset == "PASTIS-R":
             utils.roc_auc_curve_pastis(prob_pred, label_np, image_path=self.image_path)
         else:
             utils.roc_auc_curve_mtcc(prob_pred, label_np, image_path=self.image_path)
 
         # metrics: average macro -> simple average for imbalanced datasets
         metrics = {
-            'precision': precision_score(
-                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
+            "precision": precision_score(
+                label_np,
+                prediction,
+                labels=self.label_list,
+                average="macro",
+                zero_division=0,
             ),
-            'f1_score': f1_score(
-                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
+            "f1_score": f1_score(
+                label_np,
+                prediction,
+                labels=self.label_list,
+                average="macro",
+                zero_division=0,
             ),
-            'recall': recall_score(
-                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
+            "recall": recall_score(
+                label_np,
+                prediction,
+                labels=self.label_list,
+                average="macro",
+                zero_division=0,
             ),
-            'accuracy': accuracy_score(label_np, prediction),
-            'iou': jaccard_score(
-                label_np, prediction, labels=self.label_list, average='macro', zero_division=0
+            "accuracy": accuracy_score(label_np, prediction),
+            "iou": jaccard_score(
+                label_np,
+                prediction,
+                labels=self.label_list,
+                average="macro",
+                zero_division=0,
             ),
-            'roc_auc':roc_auc_score(
-                label_np, prob_pred, labels=self.label_list, average='macro', multi_class='ovo'
+            "roc_auc": roc_auc_score(
+                label_np,
+                prob_pred,
+                labels=self.label_list,
+                average="macro",
+                multi_class="ovo",
             ),
             # different indexing for MTCC
-            'confidence': self.class_confidence(label_np, prob_pred, labels=self.label_list) if self.dataset=='PASTIS-R' else self.class_confidence(label_np, prob_pred, labels=self.label_list, offset=1),
+            "confidence": (
+                self.class_confidence(label_np, prob_pred, labels=self.label_list)
+                if self.dataset == "PASTIS-R"
+                else self.class_confidence(
+                    label_np, prob_pred, labels=self.label_list, offset=1
+                )
+            ),
             # return confusion matrix as list
-            'confusion_matrix': confusion_matrix(
+            "confusion_matrix": confusion_matrix(
                 label_np, prediction, labels=self.label_list
             ).tolist(),
         }
@@ -512,12 +569,12 @@ class FineTuning:
         lambda_2=params.P_LAMBDA_2,
         count_params=True,
     ):
-        '''
+        """
         Runs fine-tuning training and validation procedure with passed dataset in a hold-out validation
-        scheme. Applies early stopping and returns best-performing model during validation. Performes 
-        mixed-precision training and saves model checkpoints periodically during training. Skips to 
-        epoch and iteration if caches model is passed. 
-        '''
+        scheme. Applies early stopping and returns best-performing model during validation. Performes
+        mixed-precision training and saves model checkpoints periodically during training. Skips to
+        epoch and iteration if caches model is passed.
+        """
 
         # count trainble params of model
         if count_params:
@@ -534,7 +591,9 @@ class FineTuning:
         val_loss = []
 
         # iterate through epochs (starting at start epoch)
-        for epoch in (pbar := tqdm(range(start_epoch, self.epochs), desc='Fine-tuning epoch')):
+        for epoch in (
+            pbar := tqdm(range(start_epoch, self.epochs), desc="Fine-tuning epoch")
+        ):
             # TRAINING
             model.train()
             # init with the saved loss for cached model, with 0 for every new epoch
@@ -543,14 +602,19 @@ class FineTuning:
             num_batches = start_iteration + 1 if start_iteration != 0 else 0
 
             # iterate through the mini-batches
-            for iteration, input_dict in enumerate(tqdm(train_dl, desc='Training', leave=True, dynamic_ncols=True)):
+            for iteration, input_dict in enumerate(
+                tqdm(train_dl, desc="Training", leave=True, dynamic_ncols=True)
+            ):
                 # skip until saved epoch and iteration:
                 if epoch == start_epoch and iteration < start_iteration:
-                    print(f'\rLoaded cached model: skip epoch {epoch+1} iteration {iteration}{params.EOL_SPACE}',end='')
+                    print(
+                        f"\rLoaded cached model: skip epoch {epoch+1} iteration {iteration}{params.EOL_SPACE}",
+                        end="",
+                    )
                     continue
 
                 # extract labels from dictionary
-                label = input_dict['EO_label'].long()
+                label = input_dict["EO_label"].long()
                 optimizer.zero_grad()
                 # learning rate scheduling via cosine annealing
                 _ = self.adjust_learning_rate(
@@ -562,20 +626,22 @@ class FineTuning:
                     min_lr=self.min_learning_rate,
                 )
                 # forward pass with mixed precision training (if cuda available)
-                with torch.autocast(device_type=params.DEVICE.type, enabled=torch.cuda.is_available()):
+                with torch.autocast(
+                    device_type=params.DEVICE.type, enabled=torch.cuda.is_available()
+                ):
                     predictions = model(input_dict)
                     # compound loss BCE and Tversky
                     loss = self.compound_loss(
                         loss_1(predictions, label),
                         loss_2(predictions, label),
                         lambda_1=lambda_1,
-                        lambda_2=lambda_2
+                        lambda_2=lambda_2,
                     )
-                    print(f'DEBUGGUNG: loss: {loss.item():.3f}') 
+                    print(f"DEBUGGUNG: loss: {loss.item():.3f}")
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
-                    # don't count 0-loss batch in loss calculation  
-                    if loss.item() !=0.0:
+                    # don't count 0-loss batch in loss calculation
+                    if loss.item() != 0.0:
                         # update batch counter
                         num_batches += 1
                     epoch_train_loss += loss.item()
@@ -596,7 +662,7 @@ class FineTuning:
                     )
 
             # append average train loss for epoch
-            if num_batches !=0:
+            if num_batches != 0:
                 train_loss.append(epoch_train_loss / num_batches)
             else:
                 train_loss.append(0.0)
@@ -607,10 +673,12 @@ class FineTuning:
             num_batches = 0
 
             # iterate through the mini-batches
-            for iteration, input_dict in enumerate(tqdm(val_dl, desc='Validation', leave=True)):
+            for iteration, input_dict in enumerate(
+                tqdm(val_dl, desc="Validation", leave=True)
+            ):
                 with torch.no_grad():
                     # extract labels from input dictionary
-                    label = input_dict['EO_label'].long()
+                    label = input_dict["EO_label"].long()
                     # forward pass
                     predictions = model(input_dict)
                     # binary compound loss CE and Focal Tversky Loss
@@ -618,25 +686,25 @@ class FineTuning:
                         loss_1(predictions, label),
                         loss_2(predictions, label),
                         lambda_1=lambda_1,
-                        lambda_2=lambda_2
+                        lambda_2=lambda_2,
                     )
-                    print(f'DEBUGGUNG: loss: {loss.item()}') 
+                    print(f"DEBUGGUNG: loss: {loss.item()}")
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
-                    # don't count 0-loss batch in loss calculation   
-                    if loss.item() !=0.0:
+                    # don't count 0-loss batch in loss calculation
+                    if loss.item() != 0.0:
                         # update batch counter
                         num_batches += 1
                     epoch_val_loss += loss.item()
 
             # append average val loss for epoch
-            if num_batches !=0:
+            if num_batches != 0:
                 val_loss.append(epoch_val_loss / num_batches)
             else:
                 val_loss.append(0.0)
 
             # loss summary for training + validation epoch
-            message = f'Training epoch {epoch + 1}: train loss: {train_loss[-1]:.4f}, validation loss: {val_loss[-1]:.4f}'
+            message = f"Training epoch {epoch + 1}: train loss: {train_loss[-1]:.4f}, validation loss: {val_loss[-1]:.4f}"
             pbar.set_description(message)
             self.logger.info(message)
 
@@ -657,7 +725,7 @@ class FineTuning:
                     # if patience exceeded -> stop
                     if epochs_since_improvement >= patience:
                         # finish before max number of epochs
-                        print('\rEarly stopping!', end='')
+                        print("\rEarly stopping!", end="")
                         break
 
         # select and return best performing model for evaluation
@@ -669,16 +737,12 @@ class FineTuning:
 
     @torch.no_grad()
     def evaluate(
-        self, 
-        model, 
-        test_dl, 
-        vis=True,
-        vis_method=utils.visualize_prediction_pastis
+        self, model, test_dl, vis=True, vis_method=utils.visualize_prediction_pastis
     ):
-        '''
-        Evaluation (test phase) of the fine-tuned segmentation model on the test set with 
+        """
+        Evaluation (test phase) of the fine-tuned segmentation model on the test set with
         option to visualize model predictions as images.
-        '''
+        """
 
         model.eval()
         # visualization lists to collect data (only visualized once per image)
@@ -693,9 +757,9 @@ class FineTuning:
         image_ctr = 0
 
         # iterate through the mini-batches
-        for input_dict in tqdm(test_dl, desc='Testing', leave=True):
+        for input_dict in tqdm(test_dl, desc="Testing", leave=True):
             # extract labels from input dictionary
-            label = input_dict['EO_label'].long()
+            label = input_dict["EO_label"].long()
             # forward pass
             prediction = model(input_dict).float()
 
@@ -712,7 +776,7 @@ class FineTuning:
                 # labels
                 vis_labels.append(label)
                 # input Earth observation data
-                vis_eo_data.append(input_dict['EO'])
+                vis_eo_data.append(input_dict["EO"])
                 # if number of pixels of an image reached
                 if pixel_ctr >= self.total_pixels:
                     # if something in buffer
@@ -727,25 +791,25 @@ class FineTuning:
                     eo_data = torch.cat(vis_eo_data, dim=0)
 
                     # replace buffer by remainder
-                    buffer_labels = [labels[self.total_pixels:]]
-                    buffer_preds = [preds[self.total_pixels:]]
-                    buffer_eo_data = [eo_data[self.total_pixels:]]
+                    buffer_labels = [labels[self.total_pixels :]]
+                    buffer_preds = [preds[self.total_pixels :]]
+                    buffer_eo_data = [eo_data[self.total_pixels :]]
                     # reset collection lists
                     vis_preds, vis_labels, vis_eo_data = [], [], []
 
                     # visualize predictions
                     vis_method(
-                        eo_data=eo_data[:self.total_pixels],
-                        preds=preds[:self.total_pixels],
-                        label=labels[:self.total_pixels],
-                        title=f'test_{image_ctr}',
+                        eo_data=eo_data[: self.total_pixels],
+                        preds=preds[: self.total_pixels],
+                        label=labels[: self.total_pixels],
+                        title=f"test_{image_ctr}",
                         image_path=self.image_path,
                     )
                     # raise image count
                     image_ctr += 1
                     # count pixels in buffer
                     pixel_ctr = buffer_labels[0].shape[0]
-        
+
         # concat to tensor
         all_labels = torch.cat(all_labels, dim=0)
         all_preds = torch.cat(all_preds, dim=0)

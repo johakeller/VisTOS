@@ -1,9 +1,10 @@
-'''
-VisTOS base module, based on the Presto-architecture (Tseng et al., 2024), which 
-offers basic objects used in both VisTOS model types, the attention-based spatial 
+"""
+VisTOS base module, based on the Presto-architecture (Tseng et al., 2024), which
+offers basic objects used in both VisTOS model types, the attention-based spatial
 encoding model and the convolution-based spatial encoding model. It comprises the
-attention modules (Block objects) and auxiliary embedding classes. 
-'''
+attention modules (Block objects) and auxiliary embedding classes.
+"""
+
 import math
 from typing import Tuple, Union, cast
 
@@ -18,14 +19,14 @@ import params
 
 
 class Attention(nn.Module):
-    '''
-    Multi-head attention module. Projects input to query, key, and value, 
-    splits each into given number of attention heads and performs 
-    scaled_dot_product attention if it is available. If not available, 
+    """
+    Multi-head attention module. Projects input to query, key, and value,
+    splits each into given number of attention heads and performs
+    scaled_dot_product attention if it is available. If not available,
     uses a fallback option.
 
     Credit: https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py
-    '''
+    """
 
     # flag: F.scaled_dot_product_attention available
     fast_attn: Final[bool]
@@ -42,14 +43,14 @@ class Attention(nn.Module):
     ):
         super().__init__()
         # embedding dimension must be divisible by number of heads
-        assert dim % num_heads == 0, "dim should be divisible by num_heads" 
+        assert dim % num_heads == 0, "dim should be divisible by num_heads"
         # number of attention-heads
-        self.num_heads = num_heads 
-        self.head_dim = dim // num_heads # dimensions per head
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads  # dimensions per head
         # scale factor for stabilization
-        self.scale = self.head_dim**-0.5 
+        self.scale = self.head_dim**-0.5
         # scaled_dot_product_attention available or not
-        self.fast_attn = hasattr(F, "scaled_dot_product_attention")  
+        self.fast_attn = hasattr(F, "scaled_dot_product_attention")
         # project input to query, key, value (3 x input)
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         # norms for query and key
@@ -65,7 +66,11 @@ class Attention(nn.Module):
         # mini-batch size B, sequence length N, number of channels C
         B, N, C = x.shape
         # calculate query, key and value -> reshape to (3, B, num_head, N, head_dim)
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+        qkv = (
+            self.qkv(x)
+            .reshape(B, N, 3, self.num_heads, self.head_dim)
+            .permute(2, 0, 3, 1, 4)
+        )
         # create separate query, key and value (each: (B, num_head, N, head_dim))
         q, k, v = qkv.unbind(0)
         # apply layer norm
@@ -74,15 +79,15 @@ class Attention(nn.Module):
         # if F.scaled_dot_product_attention is available
         if self.fast_attn:
             # GPU bug: B*num_heads expected: (B, num_heads, N, head_dim) -> (B*num_heads, N, head_dim)
-            B_head=B*self.num_heads
-            q=q.reshape(B_head,N,self.head_dim)
-            k=k.reshape(B_head,N,self.head_dim)
-            v=v.reshape(B_head,N,self.head_dim)
+            B_head = B * self.num_heads
+            q = q.reshape(B_head, N, self.head_dim)
+            k = k.reshape(B_head, N, self.head_dim)
+            v = v.reshape(B_head, N, self.head_dim)
             # if attention mask is available: reshape mask to (B,num_heads,N,N)
-            if attn_mask is not None:              
+            if attn_mask is not None:
                 attn_mask = attn_mask[:, None, None].repeat((1, self.num_heads, N, 1))
                 # GPU bug: B*num_heads expected (B, num_heads, N, N) -> (B*num_heads, N, N)
-                attn_mask=attn_mask.reshape(B_head,N,N)
+                attn_mask = attn_mask.reshape(B_head, N, N)
                 # bug fix (VF 3) for issue: https://github.com/pytorch/pytorch/issues/103749
                 # mark rows in last dimension with everything masked
                 zero_rows = ~(attn_mask.any(dim=-1))
@@ -103,7 +108,7 @@ class Attention(nn.Module):
                 if zero_rows.any():
                     x[zero_rows] = 0.0
                 # reshape (B*num_heads, N, head_dim) -> (B, num_heads, N, head_dim)
-                x=x.reshape(B, self.num_heads, N, self.head_dim)
+                x = x.reshape(B, self.num_heads, N, self.head_dim)
         else:
             # fallback option -> no attention mask implemented
             if attn_mask is not None:
@@ -121,12 +126,13 @@ class Attention(nn.Module):
         x = self.proj_drop(x)
         return x
 
+
 class Mlp(nn.Module):
-    '''
-    MLP as used in Vision Transformer, MLP-Mixer and related networks. Has 
+    """
+    MLP as used in Vision Transformer, MLP-Mixer and related networks. Has
     a GELU-nonlinearity layer, two linear layers and two dropout layers.
     Comes after multi-head attention, residual and layer norm.
-    '''
+    """
 
     def __init__(
         self,
@@ -162,12 +168,13 @@ class Mlp(nn.Module):
         x = self.drop2(x)
         return x
 
+
 class LayerScale(nn.Module):
-    '''
+    """
     Gamma is a learnable scale layer applied to the residual connection, to define
-    residual contribution. Is initialized weakly, during training, gamma learns 
+    residual contribution. Is initialized weakly, during training, gamma learns
     how much residual to contribute.
-    '''
+    """
 
     def __init__(self, dim, init_values=1e-5, inplace=False):
         super().__init__()
@@ -178,13 +185,14 @@ class LayerScale(nn.Module):
     def forward(self, x):
         return x.mul_(self.gamma) if self.inplace else x * self.gamma
 
+
 class Block(nn.Module):
-    '''
-    Comprises an attention module, which consists of a layer norm, followed by a 
-    multi-head attention module, a multi-layer perceptron, and again a layer norm. 
-    Additionally, there are two residual connections with each an optional layer 
+    """
+    Comprises an attention module, which consists of a layer norm, followed by a
+    multi-head attention module, a multi-layer perceptron, and again a layer norm.
+    Additionally, there are two residual connections with each an optional layer
     scale.
-    '''
+    """
 
     def __init__(
         self,
@@ -202,7 +210,7 @@ class Block(nn.Module):
         super().__init__()
         # layer norm 1
         self.norm1 = norm_layer(dim)
-        # multi-head attention module 
+        # multi-head attention module
         self.attn = Attention(
             dim,
             num_heads=num_heads,
@@ -213,7 +221,9 @@ class Block(nn.Module):
             norm_layer=norm_layer,
         )
         # layer scale 1
-        self.ls1 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
+        self.ls1 = (
+            LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
+        )
         # layer norm 2
         self.norm2 = norm_layer(dim)
         # multi-layer perceptron
@@ -224,25 +234,28 @@ class Block(nn.Module):
             drop=dropout,
         )
         # layer scale 2
-        self.ls2 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
+        self.ls2 = (
+            LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
+        )
 
     def forward(self, x, attn_mask=None):
         x = x + self.ls1(self.attn(self.norm1(x), attn_mask))
         x = x + self.ls2(self.mlp(self.norm2(x)))
         return x
 
+
 def get_sinusoid_encoding_table(positions, d_hid, T=1000):
-    '''
+    """
     Sinusoidal position encoding table for temporal positions
-    (meaning month time steps): int or list of integer, if 
+    (meaning month time steps): int or list of integer, if
     int range(positions).
-    '''
+    """
 
     # if only single int is passed, create a list of positions
     if isinstance(positions, int):
         positions = list(range(positions))
 
-    # calculates angle for certain position and certain embedding dimension 
+    # calculates angle for certain position and certain embedding dimension
     def cal_angle(position, hid_idx):
         return position / np.power(T, 2 * (hid_idx // 2) / d_hid)
 
@@ -261,11 +274,12 @@ def get_sinusoid_encoding_table(positions, d_hid, T=1000):
 
     return torch.FloatTensor(sinusoid_table).to(params.DEVICE)
 
+
 def get_month_encoding_table(d_hid):
-    '''
+    """
     Sinusoidal month encoding table, for 12 months indexed from 0-11. Encodes
     each month with a cyclic sinusoidal encoding.
-    '''
+    """
 
     # embedding dimensions must be divisible by 2
     assert d_hid % 2 == 0
@@ -279,20 +293,21 @@ def get_month_encoding_table(d_hid):
     # concatenate last dimension, remove last entry in first dimension (repetitive) -> (12, d_hid)
     month_table = np.concatenate([sin_table[:-1], cos_table[:-1]], axis=-1)
 
-    # return as tensor 
+    # return as tensor
     if torch.cuda.is_available():
         return torch.FloatTensor(month_table).cuda()
     else:
         return torch.FloatTensor(month_table)
 
+
 def month_to_tensor(month: Union[torch.Tensor, int], batch_size: int, seq_len: int):
-    '''
-    Creates a tensor of 12 contiguous months in length seq_len for passed month index 
-    as integer. The result has the dimension (seq_len) For a tensor of month indices, 
-    a sequence of contiguous month integer in length seq_len is created for each passed 
-    month index, the result has the dimensions (passed months, seq_len); also returned 
+    """
+    Creates a tensor of 12 contiguous months in length seq_len for passed month index
+    as integer. The result has the dimension (seq_len) For a tensor of month indices,
+    a sequence of contiguous month integer in length seq_len is created for each passed
+    month index, the result has the dimensions (passed months, seq_len); also returned
     as tensor.
-    '''
+    """
 
     # if single int passed, must encode a month as int -> values [0,11]
     if isinstance(month, int):
@@ -310,74 +325,82 @@ def month_to_tensor(month: Union[torch.Tensor, int], batch_size: int, seq_len: i
             .expand(batch_size, seq_len)
             .to(params.DEVICE)
         )
-    # if several months are passed as tensor, create a matrix with a sequence of months starting at 
+    # if several months are passed as tensor, create a matrix with a sequence of months starting at
     # each passed month
     elif len(month.shape) == 1:
         month = torch.stack(
-            [torch.fmod(torch.arange(m, m + seq_len, dtype=torch.long), 12) for m in month]
+            [
+                torch.fmod(torch.arange(m, m + seq_len, dtype=torch.long), 12)
+                for m in month
+            ]
         ).to(params.DEVICE)
     return month
 
+
 class EncoderBase(nn.Module):
-    '''
-    Encoder base module. Encoder classes of attention-based spatial encoding model and 
+    """
+    Encoder base module. Encoder classes of attention-based spatial encoding model and
     convolution-based spatial encoding model inherit from this class basic functionality.
     The forward() function is an abstract method and implemented in the respective subclass.
-    Offers building blocks for pixel-wise positional embedding of the model input 
-    (multi-channel pixel time series in sequential order), the first attention block, which 
-    performs a temporal self-attention encoding.  For fine-tuning, the time dimension can be 
+    Offers building blocks for pixel-wise positional embedding of the model input
+    (multi-channel pixel time series in sequential order), the first attention block, which
+    performs a temporal self-attention encoding.  For fine-tuning, the time dimension can be
     aggregated via a set of hierarchical convolutions and a GELU-activation function.
-    '''
+    """
 
     def __init__(
         self,
         embedding_size: int = params.EMBEDDING_SIZE,
         channel_embed_ratio: float = params.CHANNEL_EMBED_RATIO,
         month_embed_ratio: float = params.MONTHS_EMBED_RATIO,
-        depth: int =params.DEPTH,
-        mlp_ratio: int =params.MLP_RATIO,
-        num_heads: int =params.NUM_HEADS,
-        dropout:float=params.DROPOUT,
-        max_sequence_length:int =params.MAX_SEQ_LEN,
-        vis_field_size:int=params.VIS_FIELDS[0],
-        mode: str='pretrain', 
+        depth: int = params.DEPTH,
+        mlp_ratio: int = params.MLP_RATIO,
+        num_heads: int = params.NUM_HEADS,
+        dropout: float = params.DROPOUT,
+        max_sequence_length: int = params.MAX_SEQ_LEN,
+        vis_field_size: int = params.VIS_FIELDS[0],
+        mode: str = "pretrain",
     ):
         super().__init__()
         # pretraining or fine-tuning: ('pretrain', 'finetune')
-        self.mode=mode
+        self.mode = mode
         # side length of the square visual field
-        self.vis_field_size=vis_field_size
-        # padding size for unfolded input 
-        self.pad=vis_field_size//2
+        self.vis_field_size = vis_field_size
+        # padding size for unfolded input
+        self.pad = vis_field_size // 2
         # channel groups of the input
         self.band_groups = params.CHANNEL_GROUPS
         # embedding dimension of the encoder
         self.embedding_size = embedding_size
         # sequence length is variable due to compression -> pooling to fixed length
-        self.output_seq_len= 80
+        self.output_seq_len = 80
         # reduce dynamic time dimension to fixed length
-        self.adapt_pool=nn.AdaptiveAvgPool1d(output_size=self.output_seq_len)
+        self.adapt_pool = nn.AdaptiveAvgPool1d(output_size=self.output_seq_len)
         # merge time dimension
-        merge_time_kernel=self.output_seq_len//2
+        merge_time_kernel = self.output_seq_len // 2
         # 1. time convolution-> reduce to t_new/2
-        self.merge_time_1= nn.Conv1d(embedding_size, embedding_size, kernel_size=2, stride=2)
+        self.merge_time_1 = nn.Conv1d(
+            embedding_size, embedding_size, kernel_size=2, stride=2
+        )
         # GELU for aggregating time dimension
-        self.merge_time_non_linear=nn.GELU()
+        self.merge_time_non_linear = nn.GELU()
         # 2. time convolution -> reduce to 1
-        self.merge_time_2= nn.Conv1d(embedding_size, embedding_size, kernel_size=merge_time_kernel, stride=1)
+        self.merge_time_2 = nn.Conv1d(
+            embedding_size, embedding_size, kernel_size=merge_time_kernel, stride=1
+        )
         # set mode with set_mode()-> defines img_width
-        self.img_width = params.IMG_WIDTH 
+        self.img_width = params.IMG_WIDTH
 
         # this is used for the channel embedding
         self.band_group_to_idx = {
-            group_name: data['id'] for group_name,data in self.band_groups.items()
+            group_name: data["id"] for group_name, data in self.band_groups.items()
         }
-        self.band_group_to_idx['DW'] = max(self.band_group_to_idx.values()) + 1
+        self.band_group_to_idx["DW"] = max(self.band_group_to_idx.values()) + 1
 
         # token embedding
         self.eo_patch_embed = nn.ModuleDict(
             {
-                group_name: nn.Linear(len(data['idx']), embedding_size)
+                group_name: nn.Linear(len(data["idx"]), embedding_size)
                 for group_name, data in params.CHANNEL_GROUPS.items()
             }
         )
@@ -401,49 +424,53 @@ class EncoderBase(nn.Module):
                 for _ in range(depth)
             ]
         )
-        
 
         self.norm = nn.LayerNorm(embedding_size)
 
         # the positional + monthly + channel embedding
         self.max_sequence_length = max_sequence_length
         # length of position embedding in embedding dimension
-        pos_embedding_size = int(embedding_size * (1 - (channel_embed_ratio + month_embed_ratio)))
+        pos_embedding_size = int(
+            embedding_size * (1 - (channel_embed_ratio + month_embed_ratio))
+        )
         # length of channel embedding in embedding dimension
         channel_embedding_size = int(embedding_size * channel_embed_ratio)
         # length of month embedding in embedding dimension
         month_embedding_size = int(embedding_size * month_embed_ratio)
-        # fixed sinusoidal position embedding 
+        # fixed sinusoidal position embedding
         self.pos_embed = nn.Parameter(
             torch.zeros(1, max_sequence_length, pos_embedding_size), requires_grad=False
         )
         # month table made from input month sequence
         month_tab = get_month_encoding_table(month_embedding_size)
-        # embed month table 
+        # embed month table
         self.month_embed = nn.Embedding.from_pretrained(month_tab, freeze=True)
-        # embed channel group 
+        # embed channel group
         self.channel_embed = nn.Embedding(
-            num_embeddings=len(params.CHANNEL_GROUPS) + 1, embedding_dim=channel_embedding_size
+            num_embeddings=len(params.CHANNEL_GROUPS) + 1,
+            embedding_dim=channel_embedding_size,
         )
 
     def initialize_weights(self):
-        '''
-        Initializes embedding weights and model weights via self.apply(). 
-        '''
+        """
+        Initializes embedding weights and model weights via self.apply().
+        """
 
-        # initializes position sinusoidal encoding 
-        pos_embed = get_sinusoid_encoding_table(self.pos_embed.shape[1], self.pos_embed.shape[-1])
-        # copy values into position embedding 
+        # initializes position sinusoidal encoding
+        pos_embed = get_sinusoid_encoding_table(
+            self.pos_embed.shape[1], self.pos_embed.shape[-1]
+        )
+        # copy values into position embedding
         self.pos_embed.data.copy_(pos_embed)
         # initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
-        '''
+        """
         Initializes the encoder weights via self.apply() with Xavier-uniform
         for linear layers, bias of linear layer as 0.0. Initializes layer norm
         with 1.0 and bias of layer norm with 0.0.
-        '''
+        """
 
         # linear layer
         if isinstance(m, nn.Linear):
@@ -456,24 +483,24 @@ class EncoderBase(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def set_img_width(self,img_width):
-        '''
+    def set_img_width(self, img_width):
+        """
         Set width of input image (MTCC and PASTIS-R) for spatial
-        encoding. 
-        '''
+        encoding.
+        """
 
-        self.img_width=img_width
+        self.img_width = img_width
 
     @staticmethod
     def cartesian(latlons: torch.Tensor) -> torch.Tensor:
-        '''
+        """
         Converts latitude/longitude coordinates into cartesian 3D unit vectors
         (x, y, z):
-        
+
         x= cos(latitude)*cos(longitude)
         y= cos(latitude)*sin(longitude)
         z= sin(latitude)
-        '''
+        """
         with torch.no_grad():
             # an embedding is calculated for all timesteps. This is then expanded
             # for each timestep in the sequence
@@ -486,18 +513,20 @@ class EncoderBase(nn.Module):
 
     @staticmethod
     def mask_tokens(x, mask):
-        '''
+        """
         Compression method: Sorts per batch (b=batch size, t=time steps, e=embedding dimension) all
         non-masked time steps to the front. Crops the entire batch in the time dimension (2nd dimension)
-        to the maximum length of unmasked time steps in the batch. Saves the original indices in the 
-        return variable of the same name, applies the compression to the input and the mask. 
-        '''
+        to the maximum length of unmasked time steps in the batch. Saves the original indices in the
+        return variable of the same name, applies the compression to the input and the mask.
+        """
 
         # convert integer mask to boolean
         mask = mask.bool()
         # https://stackoverflow.com/a/68621610/2332296
         # move all non-masked values to the front of their rows
-        sorted_mask, indices = torch.sort((~mask).int(), dim=1, descending=True, stable=True)
+        sorted_mask, indices = torch.sort(
+            (~mask).int(), dim=1, descending=True, stable=True
+        )
         x = x.gather(1, indices[:, :, None].expand_as(x))
         # set masked values to 0 (not really necessary since they are ignored anyway)
         x = x * sorted_mask.unsqueeze(-1)
@@ -514,18 +543,19 @@ class EncoderBase(nn.Module):
         input_dict: dict,
         eval_task: bool = True,
     ):
-        '''
+        """
         Conducts forward pass of the encoder: has to be implemented in subclasses.
-        '''
+        """
 
         raise NotImplementedError
 
+
 class DecoderBase(nn.Module):
-    '''
+    """
     Base class for the decoder module used in the VisTOS pretraining autoencoder
-    architecture. The decoder reconstructs from the encoder representation the 
-    Earth observation data and the Dynamic World data. 
-    '''
+    architecture. The decoder reconstructs from the encoder representation the
+    Earth observation data and the Dynamic World data.
+    """
 
     def __init__(
         self,
@@ -544,10 +574,10 @@ class DecoderBase(nn.Module):
 
         # this is used for the channel embedding: get indices of channel groups
         self.band_group_to_idx = {
-            group_name: data['id'] for group_name,data in self.band_groups.items()
+            group_name: data["id"] for group_name, data in self.band_groups.items()
         }
         # index of Dynamic World as last channel group index
-        self.band_group_to_idx['DW'] = max(self.band_group_to_idx.values()) + 1
+        self.band_group_to_idx["DW"] = max(self.band_group_to_idx.values()) + 1
 
         # linear projection from encoder output to decoder embedding
         self.decoder_embed = nn.Linear(encoder_embed_dim, decoder_embed_dim, bias=True)
@@ -573,15 +603,15 @@ class DecoderBase(nn.Module):
 
         self.decoder_norm = nn.LayerNorm(decoder_embed_dim)
 
-        # per channel group a linear layer which projects from embedding dim to 
+        # per channel group a linear layer which projects from embedding dim to
         # number of channels of channel group
         self.eo_decoder_pred = nn.ModuleDict(
             {
-                group_name: nn.Linear(decoder_embed_dim, len(data['idx']))
+                group_name: nn.Linear(decoder_embed_dim, len(data["idx"]))
                 for group_name, data in self.band_groups.items()
             }
         )
-        # separate layer for Dynamic World 
+        # separate layer for Dynamic World
         self.dw_decoder_pred = nn.Linear(decoder_embed_dim, params.DW_CLASSES)
 
         # the positional, monthly, channel embedding
@@ -598,12 +628,14 @@ class DecoderBase(nn.Module):
         self.month_embed = nn.Embedding.from_pretrained(month_tab, freeze=True)
 
     def initialize_weights(self):
-        '''
-        Initializes embedding weights and model weights via self.apply. 
-        '''
-        
-        # initializes position sinusoidal encoding 
-        pos_embed = get_sinusoid_encoding_table(self.pos_embed.shape[1], self.pos_embed.shape[-1])
+        """
+        Initializes embedding weights and model weights via self.apply.
+        """
+
+        # initializes position sinusoidal encoding
+        pos_embed = get_sinusoid_encoding_table(
+            self.pos_embed.shape[1], self.pos_embed.shape[-1]
+        )
         # copy values into position embedding
         self.pos_embed.data.copy_(pos_embed)
 
@@ -611,12 +643,12 @@ class DecoderBase(nn.Module):
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
-        '''
+        """
         Initializes the encoder weights via self.apply with Xavier-uniform
         for linear layers, bias of linear layer as 0.0. Initializes layer norm
         with 1.0 and bias of layer norm with 0.0.
-        '''
-        
+        """
+
         # linear layer
         if isinstance(m, nn.Linear):
             # use xavier_uniform following official JAX ViT:
@@ -629,17 +661,22 @@ class DecoderBase(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def add_masked_tokens(self, x, orig_indices, x_mask):
-        '''
+        """
         Fills cropped time dimension with mask tokens to obtain original length
         before compression and brings time steps back into original order.
-        '''
+        """
 
-        mask_token=self.mask_token.to(x.dtype)
-        all_masked = repeat(mask_token, "d -> b t d", b=x.shape[0], t=orig_indices.shape[1])
+        mask_token = self.mask_token.to(x.dtype)
+        all_masked = repeat(
+            mask_token, "d -> b t d", b=x.shape[0], t=orig_indices.shape[1]
+        )
         mask = torch.cat(
             (
                 x_mask,
-                torch.ones((x.shape[0], orig_indices.shape[1] - x.shape[1]), device=params.DEVICE),
+                torch.ones(
+                    (x.shape[0], orig_indices.shape[1] - x.shape[1]),
+                    device=params.DEVICE,
+                ),
             ),
             dim=-1,
         )
@@ -652,29 +689,33 @@ class DecoderBase(nn.Module):
         return out
 
     def add_embeddings(self, x, month: Union[torch.Tensor, int]):
-        '''
+        """
         Method adds month embedding, channel group embedding and position embedding
-        per token to decoder input x. 
-        '''
+        per token to decoder input x.
+        """
 
         num_channel_groups = len(self.band_group_to_idx)
         # time steps -2 since srtm and latlon are removed and each possess only one time step,
         # and -1 since the srtm channel group doesn't have timesteps
         num_timesteps = int((x.shape[1] - 2) / (num_channel_groups - 1))
         # get index of srtm
-        srtm_index = self.band_group_to_idx['SRTM'] * num_timesteps
+        srtm_index = self.band_group_to_idx["SRTM"] * num_timesteps
         # month index table
         months = month_to_tensor(month, x.shape[0], num_timesteps)
 
         # when expanding the encodings, each channel_group gets num_timesteps
-        # encodings. However, there is only one SRTM token so the excess SRTM 
+        # encodings. However, there is only one SRTM token so the excess SRTM
         # encodings are removed
-        remove_mask = torch.full(size=(num_timesteps * num_channel_groups,), fill_value=False)
+        remove_mask = torch.full(
+            size=(num_timesteps * num_channel_groups,), fill_value=False
+        )
         remove_mask[torch.arange(num_timesteps - 1) + srtm_index] = True
 
         # month embedding
         month_embedding = repeat(
-            self.month_embed(months), "b t d -> b (repeat t) d", repeat=num_channel_groups
+            self.month_embed(months),
+            "b t d -> b (repeat t) d",
+            repeat=num_channel_groups,
         )
         month_embedding = month_embedding[:, ~remove_mask]
         month_embedding[:, srtm_index] = 0
@@ -703,7 +744,8 @@ class DecoderBase(nn.Module):
 
         # add the zero embedding for the latlon token
         positional_embedding = torch.cat(
-            [torch.zeros_like(positional_embedding[:, 0:1, :]), positional_embedding], dim=1
+            [torch.zeros_like(positional_embedding[:, 0:1, :]), positional_embedding],
+            dim=1,
         )
 
         # add to input
@@ -711,10 +753,10 @@ class DecoderBase(nn.Module):
         return x
 
     def reconstruct_inputs(self, x) -> Tuple[torch.Tensor, torch.Tensor]:
-        '''
-        Reconstructs EO channels per channel group from decoder tokens and 
-        logits for Dynamic World tokens. 
-        '''
+        """
+        Reconstructs EO channels per channel group from decoder tokens and
+        logits for Dynamic World tokens.
+        """
 
         # remove the latlon token
         x = x[:, 1:, :]
@@ -724,10 +766,10 @@ class DecoderBase(nn.Module):
         # reconstruct original number of time steps per channel group
         num_timesteps = int((x.shape[1] - 1) / num_channel_groups)
         # indices of srtm
-        srtm_index = self.band_group_to_idx['SRTM'] * num_timesteps
+        srtm_index = self.band_group_to_idx["SRTM"] * num_timesteps
         # extract srtm
         srtm_token = x[:, srtm_index : srtm_index + 1, :]
-        
+
         # remove srtm from input
         mask = torch.full((x.shape[1],), True, device=x.device)
         mask[torch.tensor(srtm_index)] = False
@@ -739,7 +781,7 @@ class DecoderBase(nn.Module):
         # reconstructs channels per channel group as decoder prediction
         eo_output, dw_output = [], None
         for group_name, idx in self.band_group_to_idx.items():
-            if group_name == 'SRTM':
+            if group_name == "SRTM":
                 eo_output.append(
                     repeat(
                         self.eo_decoder_pred[group_name](srtm_token),
@@ -749,7 +791,7 @@ class DecoderBase(nn.Module):
                 )
             else:
                 # srtm is removed, so all indices shifted by -1
-                if idx > self.band_group_to_idx['SRTM']:
+                if idx > self.band_group_to_idx["SRTM"]:
                     idx -= 1
                 group_tokens = x[:, idx]
                 if group_name == "DW":
@@ -761,15 +803,9 @@ class DecoderBase(nn.Module):
         # is ordered
         return torch.cat(eo_output, dim=-1), cast(torch.Tensor, dw_output)
 
-    def forward(
-        self, 
-        x, 
-        orig_indices, 
-        x_mask, 
-        month
-    ):
-        '''
+    def forward(self, x, orig_indices, x_mask, month):
+        """
         Conducts forward pass of the decoder: has to be implemented in sub-classes.
-        '''
+        """
 
         raise NotImplementedError
