@@ -19,7 +19,7 @@
 ### Fine-tuning:
 
 #### PASTIS-R dataset:
-![VisTOS Overview](docs/images/prediction_test_1.png)
+![VisTOS Overview](docs/images/pastisr_prediction_test_1.png)
 1)  Obtain the PASTIS-R dataset from: https://zenodo.org/records/5735646, change the constant
 P_PATH in params accordingly. 
 2)  The class weights for inverse frequency weighting can be started by uncommenting the main() call at the end of the pastis_dataset file. Start calculation then via: 
@@ -31,7 +31,7 @@ $ python main.py [model_type] finetune pastis [visual_field_size]. The parameter
 dictionary containing the training progress.
 
 #### MTCC dataset:
-
+![VisTOS Overview](docs/images/mtcc_prediction_test_1.png)
 1)  Obtain the dataset from: https://huggingface.co/datasets/ibm-nasa-geospatial/multi-temporal-crop-classification, change the constant MTCC_PATH in params accordingly. 
 3)  The pretrained model must reside in "output" as a .pth file following the pretraining naming conventions, with the same model type and the same visual field size you want to train. Otherwise a previously fine-tuned cached model is preferably loaded from "output/cache" if available. 
 4) Start the fine-tuning, after defining the corresponding parameters in params, with:
