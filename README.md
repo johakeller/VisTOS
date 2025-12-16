@@ -9,12 +9,12 @@
 2.  Define the `TRAIN_URL` and `VAL_URL` variables according to the Google Cloud bucket, where the data resides. Authenticate to Google Cloud.
 3.  Define `environment`, `BATCH_SIZE`, `TRAIN_DATA_LENGTH`, and  `VAL_DATA_LENGTH` in params. 
 4.  Start from the console:
-```bash
-python main.py [model_type] pretrain [visual_field_size] 
-```
-The parameter model_type can be "att" for the attention-based spatial encoding model or "conv" for the convolution-based spatial encoding model, the parameter "visual_field_size" must be defined and can be 1 (for Presto), 3 for a 3x3-pixel visual field, and 5 for a 5x5-pixel visual field in combination with the attention-based architecture ("att") and 3, 5, and 7 for a 7x7-pixel visual field for the convolution-based architecture ("conv").
-5. The model is cached automatically in the directory "output/cache", where it is saved as a
-dictionary containing the training progress. After pretraining, the model is saved as .pth file in "output". From there, it is loaded for fine-tuning.
+    ```bash
+    python main.py [model_type] pretrain [visual_field_size] 
+    ```
+    The parameter `model_type` can be `"att"` for the **attention-based spatial encoding model** or `"conv"` for the **convolution-based spatial encoding model**, the parameter `visual_field_size` must be defined and can be 1 (for Presto), 3 for a 3x3-pixel visual field, and 5 for a 5x5-pixel visual field in combination with the attention-based architecture (`"att"`) and 3, 5, and 7 for a 7x7-pixel visual field for the convolution-based architecture (`"conv"`).
+5.  The model is cached automatically in the directory `"output/cache"`, where it is saved as a
+    dictionary containing the training progress. After pretraining, the model is saved as .pth file in `"output"`. From there, it is loaded for fine-tuning.
     
 ### Fine-tuning:
 
