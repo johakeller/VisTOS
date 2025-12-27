@@ -77,11 +77,11 @@ The code of the module `pastis_r_dataset.py` is based on:
 Sainte Fare Garnot, V., Landrieu, L., & Chehata, N. (2021).
 **Multi-Modal Temporal Attention Models for Crop Mapping from Satellite Time Series.**
 arXiv. https://arxiv.org/abs/2112.07558  
-Code reference (dataloader): https://github.com/VSainteuf/pastis-benchmark/blob/main/code/dataloader.py
+Code: https://github.com/VSainteuf/pastis-benchmark/blob/main/code/dataloader.py
 
 The MTCC dataset originates from: 
 
 Cecil, M., Kordi, F., Li, H. (Steve), Khallaghi, S., & Alemohammad, H. (2023).
 **LHLS Multi Temporal Crop Classification.**
-Hugging Face dataset. https://huggingface.co/datasets/ibm-nasa-geospatial/multi-temporal-crop-classification
+Hugging Face dataset. Dataset: https://huggingface.co/datasets/ibm-nasa-geospatial/multi-temporal-crop-classification
 
