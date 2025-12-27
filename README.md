@@ -5,8 +5,6 @@
 
 ## Setup:
 
-## How to use pretraining and fine-tuning:
-
 1.  In the project root create a new virtual environment:
     ```bash
     python3 -m venv .venv
@@ -19,6 +17,8 @@
     ```bash
     python -m pip instll --upgrade pip
     pip install -r requirements.txt
+
+## How to use pretraining and fine-tuning:
 
 ### Pretraining:    
 
