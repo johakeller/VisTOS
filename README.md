@@ -2,14 +2,30 @@
 **Johannnes Keller**
 ![VisTOS Overview](docs/images/attention_architecture.png)
 *Attention-based VisTOS downstream-task architecture.*
+
+## Setup:
+
 ## How to use pretraining and fine-tuning:
+
+1.  In the project root create a new virtual environment:
+    ```bash
+    python3 -m venv .venv
+    ```
+2.  Activate virtual environment:
+    ```bash
+    source .venv/bin/activate
+    ```
+3.  Install requirements:
+    ```bash
+    python -m pip instll --upgrade pip
+    pip install -r requirements.txt
 
 ### Pretraining:    
 
 1.  Get the original pretraining dataset, following the instructions froms Tseng et al. (2024) from: https://github.com/nasaharvest/presto
 2.  Define the `TRAIN_URL` and `VAL_URL` variables according to the Google Cloud bucket, where the data resides. Authenticate to Google Cloud.
 3.  Define `environment`, `BATCH_SIZE`, `TRAIN_DATA_LENGTH`, and  `VAL_DATA_LENGTH` in params. 
-4.  Start from the console:
+4.  Start from the root directory:
     ```bash
     python main.py [model_type] pretrain [visual_field_size] 
     ```
@@ -22,6 +38,7 @@
 #### PASTIS-R dataset:
 ![VisTOS Overview](docs/images/pastisr_prediction_test_1.png)
 *VisTOS visual field size 5 prediction on PASTIS-R dataset image (one time step).*
+
 1.  Obtain the **PASTIS-R** dataset from: https://zenodo.org/records/5735646, change the constant
     `P_PATH` in `params` accordingly. 
 2.  The pretrained model must reside in `output` as a .pth file following the pretraining naming conventions, with the same model type and the same visual field size you want to train. Otherwise a previously
@@ -36,6 +53,7 @@
 #### MTCC dataset:
 ![VisTOS Overview](docs/images/mtcc_prediction_test_1.png)
 *VisTOS visual field size 3 prediction on MTCC dataset image (one time step).*
+
 1.  Obtain the **MTCC** dataset from: https://huggingface.co/datasets/ibm-nasa-geospatial/multi-temporal-crop-classification, change the constant `MTCC_PATH` in `params` accordingly. 
 3.  The pretrained model must reside in `output` as a .pth file following the pretraining naming conventions, with the same model type and the same visual field size you want to train. Otherwise a previously        
     fine-tuned cached model is preferably loaded from `output/cache` if available. 
