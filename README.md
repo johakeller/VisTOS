@@ -65,14 +65,14 @@
 
 ## Credits: 
 
-The code of the modules dataset, model, finetuning, utils, and pretraining is based on:
+The code of the modules `dataset`, `model`, `finetuning.py`, `utils.py`, and `pretraining.py` is based on:
 
 Tseng, G., Cartuyvels, R., Zvonkov, I., Purohit, M., Rolnick, D., & Kerner, H. (2024).
 **Presto: Lightweight, Pre-trained Transformers for Remote Sensing Timeseries.**
 arXiv. https://arxiv.org/abs/2304.14065  
 Code: https://github.com/nasaharvest/presto/
 
-The code of the module pastis_r_dataset is based on:
+The code of the module `pastis_r_dataset.py` is based on:
 
 Sainte Fare Garnot, V., Landrieu, L., & Chehata, N. (2021).
 **Multi-Modal Temporal Attention Models for Crop Mapping from Satellite Time Series.**
