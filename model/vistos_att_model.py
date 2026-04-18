@@ -60,21 +60,22 @@ class Encoder(vistos_base.EncoderBase, nn.Module):
             kernel_size=(self.vis_field_size, self.vis_field_size), padding=0, stride=1
         )
 
-        # spatial encoding blocks
-        self.block_2 = nn.ModuleList(
-            [
-                vistos_base.Block(
-                    embedding_size,
-                    num_heads,
-                    mlp_ratio,
-                    qkv_bias=True,
-                    norm_layer=nn.LayerNorm,
-                    dropout=dropout,
-                    attn_drop=dropout,
-                )
-                for _ in range(depth)
-            ]
-        )
+        # spatial encoding blocks -> skip if vis_field_size =1
+        if self.vis_field_size != params.VIS_FIELDS[0]:
+            self.block_2 = nn.ModuleList(
+                [
+                    vistos_base.Block(
+                        embedding_size,
+                        num_heads,
+                        mlp_ratio,
+                        qkv_bias=True,
+                        norm_layer=nn.LayerNorm,
+                        dropout=dropout,
+                        attn_drop=dropout,
+                    )
+                    for _ in range(depth)
+                ]
+            )
 
         # learned pixel position encoding (1,p,1,e)
         # -> needs to be repeated over batch b and time dim t_new
