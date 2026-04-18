@@ -63,6 +63,8 @@ class FineTuning:
         model_type="att",
         model_class=vistos_att_model,
         vis_field_size=params.VIS_FIELDS[0],
+        encoder_depth=params.DEPTH,
+        decoder_depth=params.DEPTH,
     ):
         """
         Start of the finetuning logic for fine-tuning of semantic segmentation. Initializes the
@@ -93,7 +95,11 @@ class FineTuning:
         if self.dataset == "PASTIS-R":
             # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
             pretrained_model = model_class.VistosTimeSeriesSeq2Seq.load_pretrained(
-                vis_field_size=vis_field_size, dropout=params.P_DROPOUT
+                vis_field_size=vis_field_size,
+                dropout=params.P_DROPOUT,
+                model_type=model_type,
+                encoder_depth=encoder_depth,
+                decoder_depth=decoder_depth,
             ).to(params.DEVICE)
 
             # construct the fine-tunig model from the pre-trained model
@@ -144,7 +150,11 @@ class FineTuning:
         elif self.dataset == "MTCC":
             # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
             pretrained_model = model_class.VistosTimeSeriesSeq2Seq.load_pretrained(
-                vis_field_size=vis_field_size, dropout=params.MTCC_DROPOUT
+                vis_field_size=vis_field_size,
+                dropout=params.MTCC_DROPOUT,
+                model_type=model_type,
+                encoder_depth=encoder_depth,
+                decoder_depth=decoder_depth,
             ).to(params.DEVICE)
             # construct the fine-tunig model from the pretrained model
             model = pretrained_model.construct_finetuning_model(
@@ -197,7 +207,7 @@ class FineTuning:
 
         # print and log info
         message = (
-            f'\rFine-tuning VisTOS {"VF size" if model_type == "att" else "CVF size"} {self.vis_field_size} on {self.dataset}, '
+            f'\rFine-tuning VisTOS {"CVF size" if model_type == "conv" else "VF size"} {self.vis_field_size} on {self.dataset}, '
             f"batch size {batch_size}, "
             f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
         )
@@ -478,7 +488,7 @@ class FineTuning:
             # mask class 0 instances
             void_mask = label_np != 0
             label_np = label_np[void_mask]
-            # delete column label 19 from raw predictions
+            # delete column 0 (No Data) from raw predictions
             raw_pred = raw_pred[:, 1:]
 
         # remove possible NaNs
@@ -492,8 +502,6 @@ class FineTuning:
             if self.dataset == "PASTIS-R"
             else np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask] + 1
         )
-
-        # is off by one for MTCC
 
         # get values for ROC-AUC visualization
         if self.dataset == "PASTIS-R":

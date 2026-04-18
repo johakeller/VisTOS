@@ -154,6 +154,7 @@ MASKING_RATIO = 0.75  # how much of the input is masked (in tokens -> one timest
 
 NUM_HEADS = 8  # number of attention heads per multi-head attention
 DEPTH = 2  # number of multi-head attention layers per module
+PRESTO_LARGE_DEPTH = DEPTH * 2  # depth for large VF=1 Presto model with no spatial blocks
 DROPOUT = 0.1  # dropout ratio (global)
 BIAS = 0.0  # global bias term
 MLP_RATIO = 4  # multilayer perceptron ratio for encoder (factor for hidden dimension)
@@ -220,12 +221,8 @@ FT_THRESHOLDS = [
 ]  # 10 thresholds for ROC-AUC
 # parameters to exclude from parameter count for Presto
 FT_EXCLUDE_PARAMS_PRESTO = [
-    "unfold",
-    "block_2",
     "pix_row_embed",
     "pix_col_embed",
-    "vis_field_rows",
-    "vis_field_cols",
 ]  # don't count visual field part
 
 ####################################################################### FINE-TUNING: PASTIS DATASET ################################################################################################

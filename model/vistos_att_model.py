@@ -498,16 +498,28 @@ class VistosTimeSeriesSeq2Seq(nn.Module):
         return model
 
     @classmethod
-    def load_pretrained(cls, vis_field_size, dropout):
+    def load_pretrained(
+        cls,
+        vis_field_size,
+        dropout,
+        model_type="att",
+        encoder_depth=params.DEPTH,
+        decoder_depth=params.DEPTH,
+    ):
         """
         Method to load weights from pretrained Seq2Seq model or if pretraining not finished but
         cache model dict was moved to output, load the pre-trained model from the dict.
         """
         # create model with embedding dimensions of the pretraining dataset (12 months)
-        model = cls.construct(vis_field_size=vis_field_size, dropout=dropout)
+        model = cls.construct(
+            vis_field_size=vis_field_size,
+            dropout=dropout,
+            encoder_depth=encoder_depth,
+            decoder_depth=decoder_depth,
+        )
         # saved model is either model or dict if pretraining not finished and dict renamed
         saved_model = torch.load(
-            os.path.join(params.OUTPUT, f"att_model_weights_vf{vis_field_size}.pth"),
+            os.path.join(params.OUTPUT, f"{model_type}_model_weights_vf{vis_field_size}.pth"),
             map_location=params.DEVICE,
             weights_only=True,
         )

@@ -267,8 +267,9 @@ def roc_auc_curve_mtcc(
     for class_id, color in zip(classes_display, label_colors):
         # get label for class
         label_class = (label == class_id).astype(int)
-        # prediction for class
-        predicted_class = prediction[:, class_id]
+        # prediction for class: offset by 1 because class 0 (No Data) was removed
+        # from the front of prob_pred, so column index = class_id - 1
+        predicted_class = prediction[:, class_id - 1]
         RocCurveDisplay.from_predictions(
             label_class,
             predicted_class,

@@ -30,8 +30,14 @@ def run_training(
         mode in params.MODES
     ), f"Mode {mode} not implemented. Available modes are: {params.MODES}"
 
-    # define correct model class
-    model_class = vistos_att_model if model_type == "att" else vistos_conv_model
+    # presto_large: VF=1 att model with doubled depth, no spatial blocks
+    is_presto_large = model_type == "presto_large"
+    model_class = vistos_conv_model if model_type == "conv" else vistos_att_model
+    encoder_depth = params.PRESTO_LARGE_DEPTH if is_presto_large else params.DEPTH
+    decoder_depth = params.PRESTO_LARGE_DEPTH if is_presto_large else params.DEPTH
+    if is_presto_large:
+        vis_field_size = 1
+
     # path to pre-trained model
     pretrained_model_path = os.path.join(
         params.OUTPUT, f"{model_type}_model_weights_vf{vis_field_size}.pth"
@@ -41,7 +47,10 @@ def run_training(
     if mode == "pretrain":
         # create model instance (params defined in module params)
         model = model_class.VistosTimeSeriesSeq2Seq.construct(
-            vis_field_size=vis_field_size, dropout=params.DROPOUT
+            vis_field_size=vis_field_size,
+            dropout=params.DROPOUT,
+            encoder_depth=encoder_depth,
+            decoder_depth=decoder_depth,
         ).to(params.DEVICE)
         # initialize PreTraining object
         pre_training = pretraining.PreTraining(vis_field_size=vis_field_size)
@@ -64,6 +73,8 @@ def run_training(
                 False,
                 model_type=model_type,
                 vis_field_size=vis_field_size,
+                encoder_depth=encoder_depth,
+                decoder_depth=decoder_depth,
             )
         else:
             raise FileNotFoundError(f"{pretrained_model_path} not found.")
@@ -82,6 +93,8 @@ def run_training(
                 True,
                 model_type=model_type,
                 vis_field_size=vis_field_size,
+                encoder_depth=encoder_depth,
+                decoder_depth=decoder_depth,
             )
         else:
             raise FileNotFoundError(f"{pretrained_model_path} not found.")
@@ -97,8 +110,9 @@ def main(args):
     two fine-tunnig datasets. Can start pretrainig, fine-tuning, or an valuation
     of a trained model. The argument 'att' denotes the attention-based spatial
     encoding architecture, 'conv' refers to the convolutional spatial encoding
-    architecture. The argument 'pastis' is the PASTIS-R fine-tuning dataset,
-    'mtcc' is the multi-temporal-crop-classification (MTCC) dataset.
+    architecture, 'presto_large' denotes the large Presto model (VF=1, double
+    depth, no spatial blocks). The argument 'pastis' is the PASTIS-R fine-tuning
+    dataset, 'mtcc' is the multi-temporal-crop-classification (MTCC) dataset.
     Pass arguments in the form:
 
     model architecture: 'conv'/ 'att', training type 'finetune/eval', and
@@ -107,12 +121,25 @@ def main(args):
 
     model architecture: 'conv'/ 'att', 'pretrain', and visual field size: '1'
     (only for att)/'3', '5', 7 (only for conv) for a pretraining setup
+
+    model architecture: 'presto_large', training type 'pretrain'/'finetune'/'eval'
+    (no visual field size argument — always VF=1)
     """
 
     # create output directory (output folder, images and chache withins)
     utils.init_output()
     # define model type -> convolution or attention
     model_type = args[0]
+
+    # presto_large: no vis_field_size argument (always VF=1)
+    if model_type == "presto_large":
+        if args[1] == "pretrain":
+            run_training(mode="pretrain", model_type=model_type)
+        elif args[1] in ("finetune", "eval"):
+            dataset = args[2]
+            run_training(mode=args[1], dataset=dataset, model_type=model_type)
+        return
+
     # pretraining
     if args[1] == "pretrain":
         # define visual field size
@@ -146,14 +173,19 @@ def main(args):
 if __name__ == "__main__":
     passed_args = sys.argv[1:]
     # first argument: model type
-    models = ["att", "conv"]
+    models = ["att", "conv", "presto_large"]
     # second argument: training mode
     modes = ["finetune", "pretrain", "eval"]
     # third argument: datasets
     datasets = ["pastis", "mtcc"]
     # visual field sizes
     field_sizes = params.VIS_FIELDS
-    usage = "Usage: $ python main.py ([att] ([finetune]|[eval] [pastis]|[mtcc] [1|3|5]) | ([pretrain] [1|3|5])) | ([conv] ([finetune]|[eval] [pastis]|[mtcc] [1|3|5|7]) | ([pretrain] [1|3|5|7]))"
+    usage = (
+        "Usage: $ python main.py "
+        "([att] ([finetune]|[eval] [pastis]|[mtcc] [1|3|5]) | ([pretrain] [1|3|5])) | "
+        "([conv] ([finetune]|[eval] [pastis]|[mtcc] [1|3|5|7]) | ([pretrain] [1|3|5|7])) | "
+        "([presto_large] ([finetune]|[eval] [pastis]|[mtcc]) | [pretrain])"
+    )
     # check user input: models
     if passed_args[0] not in models:
         print(usage)
@@ -164,31 +196,42 @@ if __name__ == "__main__":
         print(usage)
         sys.exit(1)
 
-    # if pretrain then following argument must be field size
-    if passed_args[1] == "pretrain":
-        if len(passed_args) != 3 or int(passed_args[2]) not in field_sizes:
+    # presto_large: no vis_field_size argument
+    if passed_args[0] == "presto_large":
+        if passed_args[1] == "pretrain" and len(passed_args) != 2:
             print(usage)
             sys.exit(1)
-
-    # if finetune then following argument must be dataset and following argument must be field size
-    if passed_args[1] == "finetune":
-        if (
-            len(passed_args) != 4
-            or passed_args[2] not in datasets
-            or int(passed_args[3]) not in field_sizes
+        if passed_args[1] in ("finetune", "eval") and (
+            len(passed_args) != 3 or passed_args[2] not in datasets
         ):
             print(usage)
             sys.exit(1)
+    else:
+        # if pretrain then following argument must be field size
+        if passed_args[1] == "pretrain":
+            if len(passed_args) != 3 or int(passed_args[2]) not in field_sizes:
+                print(usage)
+                sys.exit(1)
 
-    # if eval then following argument must be dataset and following argument must be field size
-    if passed_args[1] == "eval":
-        if (
-            len(passed_args) != 4
-            or passed_args[2] not in datasets
-            or int(passed_args[3]) not in field_sizes
-        ):
-            print(usage)
-            sys.exit(1)
+        # if finetune then following argument must be dataset and following argument must be field size
+        if passed_args[1] == "finetune":
+            if (
+                len(passed_args) != 4
+                or passed_args[2] not in datasets
+                or int(passed_args[3]) not in field_sizes
+            ):
+                print(usage)
+                sys.exit(1)
+
+        # if eval then following argument must be dataset and following argument must be field size
+        if passed_args[1] == "eval":
+            if (
+                len(passed_args) != 4
+                or passed_args[2] not in datasets
+                or int(passed_args[3]) not in field_sizes
+            ):
+                print(usage)
+                sys.exit(1)
 
     # start main()
     main(passed_args)

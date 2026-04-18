@@ -108,7 +108,7 @@ class PreTraining:
 
         # info to file and to console output
         message = (
-            f'\rPre-training VisTOS-{"attention" if model_type =="att" else "convolution"}, '
+            f'\rPre-training VisTOS-{"convolution" if model_type == "conv" else "attention"}, '
             f"hyperparameter: visual field size {self.vis_field_size}, "
             f"batch size {params.BATCH_SIZE}, "
             f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
