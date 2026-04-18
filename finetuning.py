@@ -207,7 +207,7 @@ class FineTuning:
 
         # print and log info
         message = (
-            f'\rFine-tuning VisTOS {"CVF size" if model_type == "conv" else "VF size"} {self.vis_field_size} on {self.dataset}, '
+            f'\rFine-tuning VisTOS {"CVF size" if model_type == "conv" else ("Presto Large" if model_type == "presto_large" else "VF size")} {self.vis_field_size} on {self.dataset}, '
             f"batch size {batch_size}, "
             f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
         )
