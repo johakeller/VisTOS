@@ -9,6 +9,7 @@ import math
 import os
 from copy import deepcopy
 from datetime import datetime
+from itertools import islice
 
 import numpy as np
 import torch
@@ -609,18 +610,18 @@ class FineTuning:
             # iteration counts from 0, num_batches from 1
             num_batches = start_iteration + 1 if start_iteration != 0 else 0
 
+            # fast-forward to start_iteration
+            skip = start_iteration if epoch == start_epoch else 0
+            if skip > 0:
+                print(f"\rSkipping {skip} batches to resume from checkpoint ...{params.EOL_SPACE}", end="")
+                for _ in islice(train_dl, skip):
+                    pass
+
             # iterate through the mini-batches
             for iteration, input_dict in enumerate(
-                tqdm(train_dl, desc="Training", leave=True, dynamic_ncols=True)
+                tqdm(train_dl, desc="Training", leave=True, dynamic_ncols=True),
+                start=skip,
             ):
-                # skip until saved epoch and iteration:
-                if epoch == start_epoch and iteration < start_iteration:
-                    print(
-                        f"\rLoaded cached model: skip epoch {epoch+1} iteration {iteration}{params.EOL_SPACE}",
-                        end="",
-                    )
-                    continue
-
                 # extract labels from dictionary
                 label = input_dict["EO_label"].long()
                 optimizer.zero_grad()

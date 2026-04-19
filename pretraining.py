@@ -7,6 +7,7 @@ import logging
 import math
 import os
 from datetime import datetime
+from itertools import islice
 
 import torch
 import webdataset as wds
@@ -388,16 +389,17 @@ class PreTraining:
                 total_val_num_dw_values_masked = 0
                 num_batches = 0
                 # iterate over mini-batches of epoch
+                # fast-forward to start_iteration: consume batches in a tight
+                skip = start_iteration if epoch == start_epoch else 0
+                if skip > 0:
+                    print(f"\rSkipping {skip} batches to resume from checkpoint ...{params.EOL_SPACE}", end="")
+                    for slice in islice(self.train_dataloader, skip):
+                        pass
+
                 for iteration, input_dict in enumerate(
-                    tqdm(self.train_dataloader, desc="Training", leave=True)
+                    tqdm(self.train_dataloader, desc="Training", leave=True),
+                    start=skip,
                 ):
-                    # skip until saved epoch and iteration:
-                    if epoch == start_epoch and iteration < start_iteration:
-                        print(
-                            f"\rLoaded cached model: skip epoch {epoch+1} iteration {iteration}{params.EOL_SPACE}",
-                            end="",
-                        )
-                        continue
 
                     # reset gradient
                     optimizer.zero_grad()
