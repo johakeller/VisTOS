@@ -28,9 +28,13 @@
 3.  Define `environment`, `BATCH_SIZE`, `TRAIN_DATA_LENGTH`, and  `VAL_DATA_LENGTH` in params. 
 4.  Start from the root directory:
     ```bash
-    python main.py [model_type] pretrain [visual_field_size] 
+    python main.py [model_type] pretrain [visual_field_size]
     ```
-    The parameter `model_type` can be `att` for the **attention-based spatial encoding model** or `conv` for the **convolution-based spatial encoding model**, the parameter `visual_field_size` must be defined and can be 1 (for Presto), 3 for a 3x3-pixel visual field, and 5 for a 5x5-pixel visual field in combination with the attention-based architecture (`att`) and 3, 5, and 7 for a 7x7-pixel visual field for the convolution-based architecture (`conv`).
+    For `presto_large`, no `visual_field_size` argument is needed (always VF=1):
+    ```bash
+    python main.py presto_large pretrain
+    ```
+    The parameter `model_type` can be `att` for the **attention-based spatial encoding model** or `conv` for the **convolution-based spatial encoding model**, or `presto_large` for the large Presto model (VF=1, double depth, no spatial blocks). The parameter `visual_field_size` must be defined and can be 1 (for Presto), 3 for a 3x3-pixel visual field, and 5 for a 5x5-pixel visual field in combination with the attention-based architecture (`att`) and 3, 5, and 7 for a 7x7-pixel visual field for the convolution-based architecture (`conv`).
 5.  The model is cached automatically in the directory `output/cache`, where it is saved as a
     dictionary containing the training progress. After pretraining, the model is saved as .pth file in `output`. From there, it is loaded for fine-tuning.
     
@@ -48,6 +52,10 @@
     ```bash
     python main.py [model_type] finetune pastis [visual_field_size]
     ```
+    For `presto_large`, omit the `visual_field_size`:
+    ```bash
+    python main.py presto_large finetune pastis
+    ```
 4.  The model is cached automatically in the directory `output/cache`, where it is saved as a dictionary containing the training progress.
 
 #### MTCC dataset:
@@ -60,6 +68,10 @@
 3.  Start the fine-tuning, after defining the corresponding parameters in `params`, with:
     ```bash
     python main.py [model_type] finetune mtcc [visual_field_size]
+    ```
+    For `presto_large`, omit the `visual_field_size`:
+    ```bash
+    python main.py presto_large finetune mtcc
     ```
 4.  The model is cached automatically in the directory `output/cache`, where it is saved as a dictionary containing the training progress.
 
