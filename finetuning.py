@@ -610,16 +610,17 @@ class FineTuning:
             # iteration counts from 0, num_batches from 1
             num_batches = start_iteration + 1 if start_iteration != 0 else 0
 
-            # fast-forward to start_iteration
+            # fast-forward to start_iteration 
             skip = start_iteration if epoch == start_epoch else 0
+            train_iter = iter(train_dl)
             if skip > 0:
-                print(f"\rSkipping {skip} batches to resume from checkpoint ...{params.EOL_SPACE}", end="")
-                for _ in islice(train_dl, skip):
+                print(f"\rSkipping {skip} batches to resume from checkpoint.{params.EOL_SPACE}", end="")
+                for _ in islice(train_iter, skip):
                     pass
 
             # iterate through the mini-batches
             for iteration, input_dict in enumerate(
-                tqdm(train_dl, desc="Training", leave=True, dynamic_ncols=True),
+                tqdm(train_iter, desc="Training", leave=True, dynamic_ncols=True),
                 start=skip,
             ):
                 # extract labels from dictionary

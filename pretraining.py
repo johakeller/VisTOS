@@ -389,15 +389,16 @@ class PreTraining:
                 total_val_num_dw_values_masked = 0
                 num_batches = 0
                 # iterate over mini-batches of epoch
-                # fast-forward to start_iteration: consume batches in a tight
+                # fast-forward to start_iteration 
                 skip = start_iteration if epoch == start_epoch else 0
+                train_iter = iter(self.train_dataloader)
                 if skip > 0:
-                    print(f"\rSkipping {skip} batches to resume from checkpoint ...{params.EOL_SPACE}", end="")
-                    for slice in islice(self.train_dataloader, skip):
+                    print(f"\rSkipping {skip} batches to resume from checkpoint.{params.EOL_SPACE}", end="")
+                    for _ in islice(train_iter, skip):
                         pass
 
                 for iteration, input_dict in enumerate(
-                    tqdm(self.train_dataloader, desc="Training", leave=True),
+                    tqdm(train_iter, desc="Training", leave=True),
                     start=skip,
                 ):
 
