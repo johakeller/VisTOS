@@ -15,11 +15,11 @@ import torch
 # environment used: ['colab', 'cluster',''cluster_portia','local', 'hpc']
 environment_ = "colab"
 # general paths
-OUTPUT = "./output"  # output folder
-# define cache directory
 if environment_ == "colab":
-    CACHE = "/content/drive/MyDrive/model_cache"  # Colab
+    OUTPUT = "/content/drive/MyDrive/model_cache"  # Colab: everything lands on Drive
+    CACHE = OUTPUT
 else:
+    OUTPUT = "./output"  # output folder
     CACHE = os.path.join(OUTPUT, "cache/")  # cache for model checkpoints
 # convert rad to meter: 1 rad equals 11320 meters
 FACTOR_METERS_PER_DEG = 111320
