@@ -23,6 +23,7 @@ else:
     CACHE = os.path.join(OUTPUT, "cache/")  # cache for model checkpoints
 # convert rad to meter: 1 rad equals 11320 meters
 FACTOR_METERS_PER_DEG = 111320
+SEED = 123
 # end of line spaces in print statements
 EOL_SPACE = " " * 40
 # define device
@@ -256,13 +257,13 @@ P_IMG_WIDTH = 128  # width of a PASTIS-R image
 P_NUM_PIXELS = 16384  # number of pixels per image (128^2)
 P_MAX_SEQ_LEN = 12  # 12 months maximum sequence length for PASTIS-R
 P_BATCH_SIZE = (
-    P_IMG_WIDTH * 8
+    P_IMG_WIDTH * 16 # 8
 )  # PASTIS-R number of samples (pixels time series) -> should be more than vis_field_size*FT_IMG_WITDH (otherwise too much padding)
 P_MAX_EPOCHS = 10  # number of fine-tuning epochs
 P_MAX_LR = 1e-4  # maximum lerning rate for PASTIS-R
 P_MIN_LR = 1e-6
 P_WEIGHT_DECAY = 0.01  # weight decay term for PASTIS-R
-P_DROPOUT = 0.1
+P_DROPOUT = 0.2  # 0.1 dropout rate for PASTIS-R
 
 # params for multi-class segmentation
 P_TVERSKY_ALPHA = 0.6  # penalization for false positives (FTL)
@@ -457,4 +458,88 @@ MTCC_CLASS_COLORS = [
     (0.7686274509803922, 0.611764705882353, 0.5803921568627451),
     (0.8901960784313725, 0.4666666666666667, 0.7607843137254902),
     (0.9686274509803922, 0.7137254901960784, 0.8235294117647058),
+]
+
+####################################################################### FINE-TUNING: MULTISENGE DATASET ################################################################################################
+
+# paths
+# paths Colab
+if environment_ == "colab":
+    MULTISENGE_ROOT_DIR = "/content/MultiSenGE/"
+# paths Cluster: Hex, Hal
+elif environment_ == "cluster":
+    MULTISENGE_ROOT_DIR = "/shared/datasets/MultiSenGE/"
+# Portia
+elif environment_ == "cluster_portia":
+    MULTISENGE_ROOT_DIR = os.path.expanduser("~/data/MultiSenGE/")
+# HPC
+elif environment_ == "hpc":
+    MULTISENGE_ROOT_DIR = "/scratch/johakeller/datasets/MultiSenGE/"
+# default: local path
+else:
+    MULTISENGE_ROOT_DIR = "/home/johannes/Documents/VisTOS/data/MultiSenGE/"  # local path to MultiSenGE dataset
+MULTISENGE_LABELS = os.path.join(MULTISENGE_ROOT_DIR, "labels")  # path to JSON label files
+MULTISENGE_S1_PATH = os.path.join(MULTISENGE_ROOT_DIR, "S1")  # path to Sentinel-1 data
+MULTISENGE_S2_PATH = os.path.join(MULTISENGE_ROOT_DIR, "S2")  # path to Sentinel-2 data
+MULTISENGE_GR_PATH = os.path.join(MULTISENGE_ROOT_DIR, "GR")  # path to ground reference data
+
+MULTISENGE_IMG_WIDTH = 256  # side length in pixels of image
+MULTISENGE_NUM_PIXELS = MULTISENGE_IMG_WIDTH**2  # number of pixels per image (256^2)
+MULTISENGE_MAX_SEQ_LEN = 12  # 12 months maximum sequence length
+MULTISENGE_BATCH_SIZE = MULTISENGE_IMG_WIDTH * 8  # number of samples (pixels time series)
+MULTISENGE_MAX_EPOCHS = 10  # number of fine-tuning epochs
+MULTISENGE_MAX_LR = 1e-4  # maximum learning rate
+MULTISENGE_MIN_LR = 1e-6  # minimum learning rate
+MULTISENGE_WEIGHT_DECAY = 0.01  # weight decay term
+MULTISENGE_DROPOUT = 0.2  # global dropout rate
+
+MULTISENGE_TVERSKY_ALPHA = 0.6  # penalization for false positives (FTL)
+MULTISENGE_TVERSKY_BETA = 0.4  # penalization for false negatives (FTL)
+MULTISENGE_TVERSKY_GAMMA = 1.5  # focus on rare classes (FTL)
+MULTISENGE_LAMBDA_1 = 0.7  # Tversky ratio in combined loss
+MULTISENGE_LAMBDA_2 = 1 - MULTISENGE_LAMBDA_1  # cross-entropy ratio in combined loss
+MULTISENGE_CE_LABEL_SMOOTHING = 0.1  # label smoothing term for cross-entropy
+
+MULTISENGE_LABELS_DICT = {
+    "No crop": 0,
+    "Sugar beet": 1,
+    "Summer oat": 2,
+    "Meadow": 3,
+    "Rape": 4,
+    "Hop": 5,
+    "Winter spelt": 6,
+    "Winter triticale": 7,
+    "Beans": 8,
+    "Winter wheat": 9,
+    "Winter barley": 10,
+    "Winter rye": 11,
+    "Summer barley": 12,
+    "Maize": 13,
+    "Potatoes": 14,
+    "Soybeans": 15,
+    "Asparagus": 16,
+}
+MULTISENGE_LABELS_INV = {value: key for key, value in MULTISENGE_LABELS_DICT.items()}
+MULTISENGE_NUM_OUTPUTS = len(MULTISENGE_LABELS_DICT)  # number of classes
+MULTISENGE_CLASSES = list(range(1, MULTISENGE_NUM_OUTPUTS))  # exclude No crop
+
+MULTISENGE_DELTA = 0.5  # weight dampen parameter
+MULTISENGE_CLASS_COLORS = [
+    (0, 0, 0),
+    (0.8392156862745098, 0.15294117647058825, 0.1568627450980392),
+    (0.17254901960784313, 0.6274509803921569, 0.17254901960784313),
+    (0.596078431372549, 0.8745098039215686, 0.5411764705882353),
+    (1.0, 0.4980392156862745, 0.054901960784313725),
+    (0.5803921568627451, 0.403921568627451, 0.7411764705882353),
+    (0.09019607843137255, 0.7450980392156863, 0.8117647058823529),
+    (0.7725490196078432, 0.6901960784313725, 0.8352941176470588),
+    (0.6823529411764706, 0.7803921568627451, 0.9098039215686274),
+    (1.0, 0.7333333333333333, 0.47058823529411764),
+    (0.7372549019607844, 0.7411764705882353, 0.13333333333333333),
+    (0.8588235294117647, 0.8588235294117647, 0.5529411764705883),
+    (0.5490196078431373, 0.33725490196078434, 0.29411764705882354),
+    (1.0, 0.596078431372549, 0.5882352941176471),
+    (0.4980392156862745, 0.4980392156862745, 0.4980392156862745),
+    (0.7803921568627451, 0.7803921568627451, 0.7803921568627451),
+    (0.8901960784313725, 0.4666666666666667, 0.7607843137254902),
 ]

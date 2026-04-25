@@ -27,7 +27,7 @@ class MultiTempCropClass(IterableDataset):
     """
 
     def __init__(
-        self, split="train", batch_size=params.MTCC_BATCH_SIZE, shuffle=False, seed=123
+        self, split="train", batch_size=params.MTCC_BATCH_SIZE, shuffle=False, seed=params.SEED
     ):
         self.seed = seed
         self.rand = random.Random(self.seed)

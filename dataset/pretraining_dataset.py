@@ -29,7 +29,7 @@ class PreTrainingDataset:
         length=None,
         vis_field_size=params.VIS_FIELDS[1],
         shuffle=False,
-        seed=123,
+        seed=params.SEED,
         time_steps=params.TIME_STEPS,
         masking_strategies=None,
     ):

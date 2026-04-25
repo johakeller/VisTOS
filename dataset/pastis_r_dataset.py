@@ -32,7 +32,7 @@ class PastisRDataset(IterableDataset):
         batch_size=params.P_BATCH_SIZE,
         max_length=None,
         shuffle=False,
-        seed=123,
+        seed=params.SEED,
     ):
         self.seed = seed
         self.rand = random.Random(self.seed)
