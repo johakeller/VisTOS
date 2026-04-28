@@ -393,12 +393,12 @@ class PreTraining:
                 skip = start_iteration if epoch == start_epoch else 0
                 train_iter = iter(self.train_dataloader)
                 if skip > 0:
-                    print(f"\rSkipping {skip} batches to resume from checkpoint.{params.EOL_SPACE}", end="")
+                    print(f"\rEpoch {epoch + 1}/{self.epochs}: skipping {skip} batches to resume from checkpoint.{params.EOL_SPACE}", end="")
                     for _ in islice(train_iter, skip):
                         pass
 
                 for iteration, input_dict in enumerate(
-                    tqdm(train_iter, desc="Training", leave=True),
+                    tqdm(train_iter, desc=f"Epoch {epoch + 1}/{self.epochs} training", leave=True),
                     start=skip,
                 ):
 
