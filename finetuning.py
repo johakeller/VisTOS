@@ -80,7 +80,7 @@ class FineTuning:
         """
         # init logger
         self.logger = utils.init_logger(
-            name=f"finetuning_{self.dataset}_{model_type}_vf{self.vis_field_size}"
+            name=f"finetuning_{self.dataset}_{model_type}" + ("" if model_type == "presto_large" else f"_vf{self.vis_field_size}")
         )
         # set start epoch, start iteration, previous loss to 0
         epoch = 0

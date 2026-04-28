@@ -36,7 +36,9 @@ def init_logger(output_dir=params.OUTPUT, name="pretraining"):
     """
 
     logger = logging.getLogger(name)
-    # prevent duplicate logs
+    # prevent duplicate logs from re-initialization within the same session
+    if logger.handlers:
+        logger.handlers.clear()
     logger.propagate = False
     formatter = logging.Formatter(fmt="%(message)s")
 
@@ -44,9 +46,16 @@ def init_logger(output_dir=params.OUTPUT, name="pretraining"):
 
     # specify saving path
     path = os.path.join(output_dir, name)
-    fh = logging.FileHandler(path, mode="w")
+    fh = logging.FileHandler(path, mode="a")
     fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
+    # flush after every record so Google Drive sees writes immediately
+    fh.terminator = "\n"
+    original_emit = fh.emit
+    def flushing_emit(record):
+        original_emit(record)
+        fh.flush()
+    fh.emit = flushing_emit
     logger.addHandler(fh)
 
     return logger

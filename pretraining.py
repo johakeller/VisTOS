@@ -104,7 +104,7 @@ class PreTraining:
 
         # init logger
         self.logger = utils.init_logger(
-            name=f"pretraining_{model_type}_vf{self.vis_field_size}"
+            name=f"pretraining_{model_type}" + ("" if model_type == "presto_large" else f"_vf{self.vis_field_size}")
         )
 
         # info to file and to console output
