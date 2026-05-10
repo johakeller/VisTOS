@@ -94,7 +94,7 @@
 #### MultiSenGE dataset:
 
 1.  Obtain the **MultiSenGE** dataset from: https://zenodo.org/records/6375084, change the constant
-    `MULTISENGE_ROOT_DIR` in `params` accordingly. The directory must contain `labels/`, `ground_reference/`, `s1/`, and `s2/`.
+    `MULTISENGE_ROOT_DIR` in `params` accordingly. 
 2.  Create the selected subset and train/validation/test split files:
     ```bash
     python -m dataset.multisenge_dataset splits
