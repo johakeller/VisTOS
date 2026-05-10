@@ -1,8 +1,9 @@
 """
 Defines central parameters for the entire program. Steers general parameters,
-pretraining-dataset-specific parameters, masking-specific paramters,
+pretraining-dataset-specific parameters, masking-specific parameters,
 model-specific parameters, general fine-tuning hyperparameters, PASTIS-R
-dataset-specific parameters, and MTCC dataset-specific parameters.
+dataset-specific parameters, MultiSenGE dataset-specific parameters and MTCC 
+dataset-specific parameters.
 """
 
 import os
@@ -155,7 +156,7 @@ MASKING_RATIO = 0.75  # how much of the input is masked (in tokens -> one timest
 
 NUM_HEADS = 8  # number of attention heads per multi-head attention
 DEPTH = 2  # number of multi-head attention layers per module
-PRESTO_LARGE_DEPTH = DEPTH * 2  # depth for large VF=1 Presto model with no spatial blocks
+PRESTO_LARGE_DEPTH = DEPTH * 2  # encoder depth for large VF=1 Presto model; decoder stays at DEPTH
 DROPOUT = 0.1  # dropout ratio (global)
 BIAS = 0.0  # global bias term
 MLP_RATIO = 4  # multilayer perceptron ratio for encoder (factor for hidden dimension)
@@ -352,7 +353,7 @@ P_CLASS_COLORS = [
     (1, 1, 1),
 ]
 
-####################################################################### FINE-TUNING: MTC DATASET ################################################################################################
+####################################################################### FINE-TUNING: MTCC DATASET ################################################################################################
 
 # paths
 # paths Colab
@@ -466,25 +467,16 @@ MTCC_CLASS_COLORS = [
 # paths Colab
 if environment_ == "colab":
     MULTISENGE_ROOT_DIR = "/content/MultiSenGE/"
-# paths Cluster: Hex, Hal
-elif environment_ == "cluster":
-    MULTISENGE_ROOT_DIR = "/shared/datasets/MultiSenGE/"
-# Portia
-elif environment_ == "cluster_portia":
-    MULTISENGE_ROOT_DIR = os.path.expanduser("~/data/MultiSenGE/")
-# HPC
-elif environment_ == "hpc":
-    MULTISENGE_ROOT_DIR = "/scratch/johakeller/datasets/MultiSenGE/"
 # default: local path
 else:
     MULTISENGE_ROOT_DIR = "/home/johannes/Documents/VisTOS/data/MultiSenGE/"  # local path to MultiSenGE dataset
 MULTISENGE_LABELS = os.path.join(MULTISENGE_ROOT_DIR, "labels")  # path to JSON label files
-MULTISENGE_S1_PATH = os.path.join(MULTISENGE_ROOT_DIR, "S1")  # path to Sentinel-1 data
-MULTISENGE_S2_PATH = os.path.join(MULTISENGE_ROOT_DIR, "S2")  # path to Sentinel-2 data
-MULTISENGE_GR_PATH = os.path.join(MULTISENGE_ROOT_DIR, "GR")  # path to ground reference data
+MULTISENGE_S1_PATH = os.path.join(MULTISENGE_ROOT_DIR, "s1")  # path to Sentinel-1 data
+MULTISENGE_S2_PATH = os.path.join(MULTISENGE_ROOT_DIR, "s2")  # path to Sentinel-2 data
+MULTISENGE_GR_PATH = os.path.join(MULTISENGE_ROOT_DIR, "ground_reference")  # path to ground reference data
 
 MULTISENGE_IMG_WIDTH = 256  # side length in pixels of image
-MULTISENGE_NUM_PIXELS = MULTISENGE_IMG_WIDTH**2  # number of pixels per image (256^2)
+MULTISENGE_NUM_PIXELS = MULTISENGE_IMG_WIDTH**2  # number of pixels per image
 MULTISENGE_MAX_SEQ_LEN = 12  # 12 months maximum sequence length
 MULTISENGE_BATCH_SIZE = MULTISENGE_IMG_WIDTH * 8  # number of samples (pixels time series)
 MULTISENGE_MAX_EPOCHS = 10  # number of fine-tuning epochs
@@ -493,13 +485,37 @@ MULTISENGE_MIN_LR = 1e-6  # minimum learning rate
 MULTISENGE_WEIGHT_DECAY = 0.01  # weight decay term
 MULTISENGE_DROPOUT = 0.2  # global dropout rate
 
-MULTISENGE_TVERSKY_ALPHA = 0.6  # penalization for false positives (FTL)
-MULTISENGE_TVERSKY_BETA = 0.4  # penalization for false negatives (FTL)
-MULTISENGE_TVERSKY_GAMMA = 1.5  # focus on rare classes (FTL)
+# dataset split
+MULTISENGE_SELECTED_SAMPLES = 2300  # number of selected samples
+MULTISENGE_SEED = SEED  # seed for split generation
+MULTISENGE_SPLIT_RATIO = (0.6, 0.2, 0.2)  # train, validation, test
+
+# normalization factor
+MULTISENGE_S2_NORM = 1.0 / 10000.0
+MULTISENGE_S1_SHIFT = 25.0
+MULTISENGE_S1_DIV = 25.0
+
+# source band indices in MultiSenGE S2 GeoTIFF
+MULTISENGE_S2_BAND_MAP = {
+    "S2_RGB": [0, 1, 2],  # B2, B3, B4
+    "S2_Red_Edge": [4, 5, 6],  # B5, B6, B7
+    "S2_NIR_10": [3],  # B8
+    "S2_NIR_20": [7],  # B8A
+    "S2_SWIR": [8, 9],  # B11, B12
+}
+MULTISENGE_S2_RED_BAND = 2  # B4 index in GeoTIFF
+MULTISENGE_S2_NIR_BAND = 3  # B8 index in GeoTIFF
+MULTISENGE_IGNORE_INDEX = 0  # No crop class
+
+# params for multi-class segmentation
+MULTISENGE_TVERSKY_ALPHA = 0.6  # penalization for false positives
+MULTISENGE_TVERSKY_BETA = 0.4  # penalization for false negatives
+MULTISENGE_TVERSKY_GAMMA = 1.5  # focus on rare classes
 MULTISENGE_LAMBDA_1 = 0.7  # Tversky ratio in combined loss
 MULTISENGE_LAMBDA_2 = 1 - MULTISENGE_LAMBDA_1  # cross-entropy ratio in combined loss
 MULTISENGE_CE_LABEL_SMOOTHING = 0.1  # label smoothing term for cross-entropy
 
+# labels to int
 MULTISENGE_LABELS_DICT = {
     "No crop": 0,
     "Sugar beet": 1,
@@ -519,9 +535,32 @@ MULTISENGE_LABELS_DICT = {
     "Soybeans": 15,
     "Asparagus": 16,
 }
+# to address label name via value
 MULTISENGE_LABELS_INV = {value: key for key, value in MULTISENGE_LABELS_DICT.items()}
 MULTISENGE_NUM_OUTPUTS = len(MULTISENGE_LABELS_DICT)  # number of classes
-MULTISENGE_CLASSES = list(range(1, MULTISENGE_NUM_OUTPUTS))  # exclude No crop
+MULTISENGE_CLASSES = list(range(1, MULTISENGE_NUM_OUTPUTS))  # exclude no crop
+
+# inverse frequency weights
+multisenge_weights_ = {
+    "No crop": 0,
+    "Sugar beet": 3.014082e-06,
+    "Summer oat": 2.786142e-07,
+    "Meadow": 5.590649e-07,
+    "Rape": 2.552264e-06,
+    "Hop": 1.208039e-06,
+    "Winter spelt": 2.791072e-08,
+    "Winter triticale": 1.014697e-06,
+    "Beans": 5.517546e-06,
+    "Winter wheat": 5.949547e-08,
+    "Winter barley": 1.226542e-04,
+    "Winter rye": 3.495381e-08,
+    "Summer barley": 3.264773e-04,
+    "Maize": 3.336303e-06,
+    "Potatoes": 1.270656e-06,
+    "Soybeans": 0,
+    "Asparagus": 0,
+}
+MULTISENGE_WEIGHTS = torch.tensor(list(multisenge_weights_.values()))
 
 MULTISENGE_DELTA = 0.5  # weight dampen parameter
 MULTISENGE_CLASS_COLORS = [

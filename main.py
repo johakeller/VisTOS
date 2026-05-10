@@ -30,11 +30,11 @@ def run_training(
         mode in params.MODES
     ), f"Mode {mode} not implemented. Available modes are: {params.MODES}"
 
-    # presto_large: VF=1 att model with doubled depth, no spatial blocks
+    # presto_large: VF=1 att model with doubled encoder depth, no spatial blocks
     is_presto_large = model_type == "presto_large"
     model_class = vistos_conv_model if model_type == "conv" else vistos_att_model
     encoder_depth = params.PRESTO_LARGE_DEPTH if is_presto_large else params.DEPTH
-    decoder_depth = params.PRESTO_LARGE_DEPTH if is_presto_large else params.DEPTH
+    decoder_depth = params.DEPTH
     if is_presto_large:
         vis_field_size = 1
 
@@ -100,19 +100,20 @@ def run_training(
             raise FileNotFoundError(f"{pretrained_model_path} not found.")
     # no dataset indicated or mode unknown
     else:
-        raise ValueError(f"Training mode {mode} unkown or .")
+        raise ValueError(f"Training mode {mode} unknown or dataset missing.")
 
 
 def main(args):
     """
     Pretraining and fine-tuning are started from here with two available model
     architectures in several visual field sizes on one pretraining dataset and
-    two fine-tunnig datasets. Can start pretrainig, fine-tuning, or an valuation
+    multiple fine-tuning datasets. Can start pretraining, fine-tuning, or evaluation
     of a trained model. The argument 'att' denotes the attention-based spatial
     encoding architecture, 'conv' refers to the convolutional spatial encoding
-    architecture, 'presto_large' denotes the large Presto model (VF=1, double
-    depth, no spatial blocks). The argument 'pastis' is the PASTIS-R fine-tuning
-    dataset, 'mtcc' is the multi-temporal-crop-classification (MTCC) dataset.
+    architecture, 'presto_large' denotes the large Presto model (VF=1, doubled
+    encoder depth, base decoder depth, no spatial blocks). The argument 'pastis'
+    is the PASTIS-R fine-tuning dataset, 'mtcc' is the multi-temporal-crop-
+    classification (MTCC) dataset, and 'multisenge' is the MultiSenGE dataset.
     Pass arguments in the form:
 
     model architecture: 'conv'/ 'att', training type 'finetune/eval', and
@@ -126,7 +127,7 @@ def main(args):
     (no visual field size argument — always VF=1)
     """
 
-    # create output directory (output folder, images and chache withins)
+    # create output directory (output folder, images, and cache within)
     utils.init_output()
     # define model type -> convolution or attention
     model_type = args[0]
@@ -177,14 +178,14 @@ if __name__ == "__main__":
     # second argument: training mode
     modes = ["finetune", "pretrain", "eval"]
     # third argument: datasets
-    datasets = ["pastis", "mtcc"]
+    datasets = ["pastis", "mtcc", "multisenge"]
     # visual field sizes
     field_sizes = params.VIS_FIELDS
     usage = (
         "Usage: $ python main.py "
-        "([att] ([finetune]|[eval] [pastis]|[mtcc] [1|3|5]) | ([pretrain] [1|3|5])) | "
-        "([conv] ([finetune]|[eval] [pastis]|[mtcc] [1|3|5|7]) | ([pretrain] [1|3|5|7])) | "
-        "([presto_large] ([finetune]|[eval] [pastis]|[mtcc]) | [pretrain])"
+        "([att] ([finetune]|[eval] [pastis]|[mtcc]|[multisenge] [1|3|5]) | ([pretrain] [1|3|5])) | "
+        "([conv] ([finetune]|[eval] [pastis]|[mtcc]|[multisenge] [1|3|5|7]) | ([pretrain] [1|3|5|7])) | "
+        "([presto_large] ([finetune]|[eval] [pastis]|[mtcc]|[multisenge]) | [pretrain])"
     )
     # check user input: models
     if passed_args[0] not in models:

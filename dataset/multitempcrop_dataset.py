@@ -27,11 +27,10 @@ class MultiTempCropClass(IterableDataset):
     """
 
     def __init__(
-        self, split="train", batch_size=params.MTCC_BATCH_SIZE, shuffle=False, seed=params.SEED
+        self, split="train", shuffle=False, seed=params.SEED
     ):
         self.seed = seed
         self.rand = random.Random(self.seed)
-        self.batch_size = batch_size
 
         # split defines which part of the dataset to load
         if split == "train":
@@ -177,9 +176,10 @@ class MultiTempCropClass(IterableDataset):
         x, y = rtx.xy(transform, rows, cols, offset="center")
         x, y = np.asarray(x), np.asarray(y)
         # convert to lat/lon
-        lon, lat = rwarp.transform(
+        transformed_coords = rwarp.transform(
             src_crs=src_crs, dst_crs=dst_crs, xs=x.ravel(), ys=y.ravel()
         )
+        lon, lat = transformed_coords[0], transformed_coords[1]
         lat = np.asarray(lat).reshape(height, width)
         lon = np.asarray(lon).reshape(height, width)
         # get lat, lon pairs into on matrix

@@ -254,6 +254,141 @@ def visualize_prediction_mtcc(
     plt.close()
 
 
+def visualize_prediction_multisenge(
+    eo_data: torch.Tensor,
+    preds: torch.Tensor,
+    label: torch.Tensor,
+    title: str,
+    timestep: int = 0,
+    image_path: str = params.OUTPUT,
+):
+    """
+    Visualizes model predictions on the MultiSenGE dataset as an image and saves the result.
+    Plots an output in the form: VV-band from Sentinel-1 (for passed time step), RGB-image
+    from Sentinel-2 (for passed time step), label map, model prediction.
+    """
+
+    # encode predicted class as integer
+    pred_classes = torch.argmax(preds, dim=1)
+
+    # slice the image from flattened pixel array
+    num_chan = eo_data.shape[-1]
+    # reshape to 2D
+    img_width = params.MULTISENGE_IMG_WIDTH
+    label_img = label.reshape(img_width, img_width)
+    pred_img = pred_classes.reshape(img_width, img_width)
+
+    # search for non-empty timestep
+    eo_rgb_tmp = eo_data[:, timestep]
+    while eo_data[:, timestep, [4, 3, 2]].sum() == 0.0 and timestep < (
+        params.MULTISENGE_MAX_SEQ_LEN - 1
+    ):
+        timestep += 1
+        eo_rgb_tmp = eo_data[:, timestep]
+    eo_img = eo_rgb_tmp.reshape(img_width, img_width, num_chan)
+
+    # to numpy array
+    pred_img = pred_img.detach().cpu().numpy()
+    label_img = label_img.cpu().numpy()
+    eo_img = eo_img.cpu().numpy()
+
+    _, axs = plt.subplots(1, 4, figsize=(15, 5))
+
+    # SAR, VV polarization
+    eo_sar = eo_img[:, :, 0]
+    axs[0].imshow(eo_sar, cmap="magma")
+    axs[0].set_title("SAR VV")
+    axs[0].axis("off")
+
+    # RGB
+    eo_rgb = eo_img[:, :, [4, 3, 2]]
+    # show rgb image
+    axs[1].imshow(eo_rgb)
+    axs[1].set_title("RGB")
+    axs[1].axis("off")
+
+    label_cmap = ListedColormap(params.MULTISENGE_CLASS_COLORS)
+    # multi-class
+    axs[2].imshow(
+        label_img,
+        cmap=label_cmap,
+        vmin=0,
+        vmax=params.MULTISENGE_NUM_OUTPUTS - 1,
+        interpolation="nearest",
+    )
+    axs[2].set_title("Label")
+    axs[2].axis("off")
+
+    # prediction
+    axs[3].imshow(
+        pred_img,
+        cmap=label_cmap,
+        vmin=0,
+        vmax=params.MULTISENGE_NUM_OUTPUTS - 1,
+        interpolation="nearest",
+    )
+    axs[3].set_title("Prediction")
+    axs[3].axis("off")
+
+    # save to image path
+    if not os.path.exists(image_path):
+        os.makedirs(image_path)
+    out_path = os.path.join(image_path, f"prediction_{title}.png")
+    plt.savefig(out_path, bbox_inches="tight", pad_inches=0.3)
+    plt.close()
+
+
+def roc_auc_curve_multisenge(
+    prediction: NDArray[Any],
+    label: NDArray[Any],
+    image_path: str = params.OUTPUT,
+):
+    """
+    Plots multi-class AUC-ROC curves (for each class individually) for MultiSenGE
+    dataset for raw predictions and labels in shape (batch size, number of
+    channels) and saves it to passed directory path.
+    """
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    # six classes for ROC (Meadow=3, Rape=4, Winter wheat=9, Winter barley=10,
+    # Summer barley=12, Maize=13)
+    classes_display = [3, 4, 9, 10, 12, 13]
+    # Get corresponding colors
+    label_colors = [
+        params.MULTISENGE_CLASS_COLORS[class_id] for class_id in classes_display
+    ]
+
+    # iterate through classes and class-colors
+    for class_id, color in zip(classes_display, label_colors):
+        # get label for class
+        label_class = (label == class_id).astype(int)
+        # prediction for class: offset by 1 because class 0 (No crop) was removed
+        # from the front of prob_pred, so column index = class_id - 1
+        predicted_class = prediction[:, class_id - 1]
+        RocCurveDisplay.from_predictions(
+            label_class,
+            predicted_class,
+            name=params.MULTISENGE_LABELS_INV[class_id],
+            color=color,
+            ax=ax,
+            # chance level at last
+            plot_chance_level=(class_id == classes_display[-1]),
+        )
+    ax.set_xlabel("False positive rate", fontsize=14)
+    ax.set_ylabel("True positive rate", fontsize=14)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", labelsize=12)
+    ax.legend(loc="lower right", fontsize=14)
+
+    # save figure
+    if not os.path.exists(image_path):
+        os.makedirs(image_path)
+    out_path = os.path.join(image_path, "MultiSenGE_ROC_AUC.png")
+    plt.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+
+
 def roc_auc_curve_mtcc(
     prediction: NDArray[Any],
     label: NDArray[Any],

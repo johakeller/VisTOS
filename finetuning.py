@@ -29,7 +29,7 @@ from tqdm import tqdm
 
 import params
 import utils
-from dataset import multitempcrop_dataset, pastis_r_dataset
+from dataset import multisenge_dataset, multitempcrop_dataset, pastis_r_dataset
 from model import vistos_att_model
 
 # set scaler for mixed precision training
@@ -48,7 +48,14 @@ class FineTuning:
     """
 
     def __init__(self, vis_field_size, dataset):
-        self.dataset = "PASTIS-R" if dataset == "pastis" else "MTCC"
+        if dataset == "pastis":
+            self.dataset = "PASTIS-R"
+        elif dataset == "mtcc":
+            self.dataset = "MTCC"
+        elif dataset == "multisenge":
+            self.dataset = "MultiSenGE"
+        else:
+            raise ValueError(f"Unknown dataset: {dataset}")
         self.logger = logging.getLogger("default")
         self.vis_field_size = vis_field_size
         self.model_type = "att"
@@ -72,11 +79,12 @@ class FineTuning:
         logger, tries to load a model from cache first, if cache is empty, starts fine-tuning from
         scratch (loads pretrained model from output directory). Initializes dataset-objects,
         dataloaders and starts fine-tuning followed by evaluation. If argument eval_mode passed,
-        directly jumps into evaluation. Method has two separate branches: one for PASTIS-R dataset
-        and the other for the BraDD-S1TS dataset. The method can handle two types of models, the VisTOS VF
-        model with attention-based spatial enoding and the VisTOS CVF model with convolutional
-        spatial encoding. The type is passed via model_type argument. Cache-loading behavior is
-        defined via checkpointing argument.
+        directly jumps into evaluation. Method has three separate branches: one for PASTIS-R dataset, one 
+        for the MTCC dataset, and one for the MultiSenGE dataset. The method can handle three types of 
+        models, the VisTOS VF model with attention-based spatial encoding, the VisTOS CVF model with 
+        convolutional spatial encoding and the VisTOS Presto Large model with no spatial encoding. The 
+        type is passed via model_type argument. Cache-loading behavior is defined via checkpointing 
+        argument.
         """
         # init logger
         self.logger = utils.init_logger(
@@ -202,6 +210,62 @@ class FineTuning:
             lambda_1 = params.MTCC_LAMBDA_1
             lambda_2 = params.MTCC_LAMBDA_2
 
+        # MultiSenGE branch
+        elif self.dataset == "MultiSenGE":
+            # create pretrained Seq2Seq model (uses pretrained model from output or preferably cache if there is any)
+            pretrained_model = model_class.VistosTimeSeriesSeq2Seq.load_pretrained(
+                vis_field_size=vis_field_size,
+                dropout=params.MULTISENGE_DROPOUT,
+                model_type=model_type,
+                encoder_depth=encoder_depth,
+                decoder_depth=decoder_depth,
+            ).to(params.DEVICE)
+            # construct the fine-tunig model from the pretrained model
+            model = pretrained_model.construct_finetuning_model(
+                num_outputs=params.MULTISENGE_NUM_OUTPUTS,
+                vis_field_size=self.vis_field_size,
+                img_width=params.MULTISENGE_IMG_WIDTH,
+            ).to(params.DEVICE)
+            # training dataset
+            train_ds = multisenge_dataset.MultiSenGEDataset(
+                split="train", shuffle=True
+            )
+            # validation dataset
+            val_ds = multisenge_dataset.MultiSenGEDataset(
+                split="validation", shuffle=True
+            )
+            # test dataset
+            test_ds = multisenge_dataset.MultiSenGEDataset(
+                split="test", shuffle=True
+            )
+            # training params
+            self.total_pixels = params.MULTISENGE_NUM_PIXELS
+            batch_size = params.MULTISENGE_BATCH_SIZE
+            self.epochs = params.MULTISENGE_MAX_EPOCHS
+            self.max_learning_rate = params.MULTISENGE_MAX_LR
+            self.min_learning_rate = params.MULTISENGE_MIN_LR
+            weight_decay = params.MULTISENGE_WEIGHT_DECAY
+            vis_method = utils.visualize_prediction_multisenge
+            # exclude No crop class
+            self.label_list = list(range(1, params.MULTISENGE_NUM_OUTPUTS))
+            # FTL params
+            classes = params.MULTISENGE_CLASSES
+            from_logits = True
+            alpha = params.MULTISENGE_TVERSKY_ALPHA
+            beta = params.MULTISENGE_TVERSKY_BETA
+            gamma = params.MULTISENGE_TVERSKY_GAMMA
+            eps = 1e-4
+            mode = "multiclass"
+            # CE params
+            ignore_index = params.MULTISENGE_IGNORE_INDEX
+            label_smoothing = params.MULTISENGE_CE_LABEL_SMOOTHING
+            weight = (
+                params.MULTISENGE_WEIGHTS.to(params.DEVICE)
+            ) ** params.MULTISENGE_DELTA
+            # combined loss params
+            lambda_1 = params.MULTISENGE_LAMBDA_1
+            lambda_2 = params.MULTISENGE_LAMBDA_2
+
         # unknown dataset
         else:
             raise ValueError(f"Dataset {self.dataset} unknown.")
@@ -225,7 +289,7 @@ class FineTuning:
             gamma=gamma,
             eps=eps,
         )
-        # CE for foreground/background separation and stability
+        # CE for stability and robustness
         loss_2 = nn.CrossEntropyLoss(
             weight=weight,
             label_smoothing=label_smoothing,
@@ -284,7 +348,7 @@ class FineTuning:
             )
         # test fine-tuned model (directly accessed with eval_mode)
         results_dict = self.evaluate(model, test_dl, vis_method=vis_method)
-        # log multi-class metrics dictionary content to ouput
+        # log multi-class metrics dictionary content to output
         self.logger.info("Test metrics:")
         for metric, result in results_dict.items():
             # don't round dictionaries of metrics or confusion matrix
@@ -326,7 +390,7 @@ class FineTuning:
     def compound_loss(self, loss_1, loss_2, lambda_1, lambda_2):
         """
         Computes weighted compound loss of fine-tuning head:
-        Loss_total = lambda_1*Loss_binary +lambda_2*Loss_CE.
+        Loss_total = lambda_1*Loss_FTL +lambda_2*Loss_CE.
         """
 
         return (lambda_1 * loss_1) + (lambda_2 * loss_2)
@@ -472,7 +536,7 @@ class FineTuning:
         """
         Computes various metrics given prediction logit tensors and label tensors and returns
         them in a dictionary for further averaging. Also calls the AUC-ROC curve function from
-        module utils, which visualizes ROC-curves individually for PASTIS-R and BraDD-S1TS.
+        module utils, which visualizes ROC-curves individually for PASTIS-R, MTCC and MultiSenGE.
         """
 
         # label to numpy
@@ -484,12 +548,12 @@ class FineTuning:
             label_np = label_np[void_mask]
             # delete column label 19 from raw predictions
             raw_pred = raw_pred[:, :-1]
-        # ignore 'No Data' label in MTCC
+        # ignore class 0 in MTCC and MultiSenGE
         else:
             # mask class 0 instances
             void_mask = label_np != 0
             label_np = label_np[void_mask]
-            # delete column 0 (No Data) from raw predictions
+            # delete column 0 from raw predictions
             raw_pred = raw_pred[:, 1:]
 
         # remove possible NaNs
@@ -497,7 +561,7 @@ class FineTuning:
 
         # logit predictions to probabilities
         prob_pred = torch.softmax(raw_pred, dim=1).cpu().numpy()[void_mask]
-        # class predictions, for MTCC compensate for off by 1
+        # class predictions, for MTCC and MultiSenGE compensate for class 0
         prediction = (
             np.argmax(raw_pred.cpu().numpy(), axis=1).ravel()[void_mask]
             if self.dataset == "PASTIS-R"
@@ -507,6 +571,8 @@ class FineTuning:
         # get values for ROC-AUC visualization
         if self.dataset == "PASTIS-R":
             utils.roc_auc_curve_pastis(prob_pred, label_np, image_path=self.image_path)
+        elif self.dataset == "MultiSenGE":
+            utils.roc_auc_curve_multisenge(prob_pred, label_np, image_path=self.image_path)
         else:
             utils.roc_auc_curve_mtcc(prob_pred, label_np, image_path=self.image_path)
 
@@ -548,7 +614,7 @@ class FineTuning:
                 average="macro",
                 multi_class="ovo",
             ),
-            # different indexing for MTCC
+            # different indexing for MTCC and MultiSenGE
             "confidence": (
                 self.class_confidence(label_np, prob_pred, labels=self.label_list)
                 if self.dataset == "PASTIS-R"
@@ -582,7 +648,7 @@ class FineTuning:
         Runs fine-tuning training and validation procedure with passed dataset in a hold-out validation
         scheme. Applies early stopping and returns best-performing model during validation. Performes
         mixed-precision training and saves model checkpoints periodically during training. Skips to
-        epoch and iteration if caches model is passed.
+        epoch and iteration if cached model is passed.
         """
 
         # count trainble params of model
@@ -640,14 +706,13 @@ class FineTuning:
                     device_type=params.DEVICE.type, enabled=torch.cuda.is_available()
                 ):
                     predictions = model(input_dict)
-                    # compound loss BCE and Tversky
+                    # compound loss CE and Focal Tversky Loss
                     loss = self.compound_loss(
                         loss_1(predictions, label),
                         loss_2(predictions, label),
                         lambda_1=lambda_1,
                         lambda_2=lambda_2,
                     )
-                    print(f"DEBUGGUNG: loss: {loss.item():.3f}")
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
                     # don't count 0-loss batch in loss calculation
@@ -698,7 +763,6 @@ class FineTuning:
                         lambda_1=lambda_1,
                         lambda_2=lambda_2,
                     )
-                    print(f"DEBUGGUNG: loss: {loss.item()}")
                     # set NaNs=0
                     loss = loss.nan_to_num(0.0)
                     # don't count 0-loss batch in loss calculation

@@ -29,14 +29,12 @@ class PastisRDataset(IterableDataset):
     def __init__(
         self,
         split="train",
-        batch_size=params.P_BATCH_SIZE,
         max_length=None,
         shuffle=False,
         seed=params.SEED,
     ):
         self.seed = seed
         self.rand = random.Random(self.seed)
-        self.batch_size = batch_size
 
         # get metadata and sort samples by index
         self.meta_data = gpd.read_file(params.P_METADATA)
