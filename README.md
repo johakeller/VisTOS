@@ -139,7 +139,7 @@ Sainte Fare Garnot, V., Landrieu, L., & Chehata, N. (2021).
 arXiv. https://arxiv.org/abs/2112.07558  
 Code: https://github.com/VSainteuf/pastis-benchmark/blob/main/code/dataloader.py
 
-The MultiSenGE dataset originates from:
+The MultiSenGE dataset in the module `multisenge_dataset.py` originates from:
 
 Schmitt, M., et al. (2021). **MultiSenGE.** Zenodo. https://zenodo.org/records/6375084
 
