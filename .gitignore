@@ -12,3 +12,4 @@ start_finetune.sh
 start_pretrain.sh
 master-thesis-presto.json
 start_finetune.sbatch
+output/multisenge_dataset_stats.txt

@@ -56,6 +56,9 @@ class MultiSenGEDataset(IterableDataset):
         # get split samples idx list
         self.sample_idx = self.load_split(split)
 
+        # filter out samples with no existing image files and report stats
+        self.sample_idx = self._validate_samples(self.sample_idx, split)
+
         # apply shuffling
         if shuffle:
             self.rand.shuffle(self.sample_idx)
@@ -70,6 +73,41 @@ class MultiSenGEDataset(IterableDataset):
         """
 
         return self.data_length
+
+    def _validate_samples(self, sample_ids, split):
+        """
+        Filters sample IDs to those with at least one existing image file.
+        Prints stats and appends them to the dataset stats file.
+        """
+
+        valid_ids = []
+        for sample_id in sample_ids:
+            data = self.read_json(sample_id)
+            s1_files = self.split_filenames(data["corresponding_s1"])
+            s2_files = self.split_filenames(data["corresponding_s2"])
+            has_file = any(
+                os.path.exists(os.path.join(self.s1_path, f)) for f in s1_files
+            ) or any(
+                os.path.exists(os.path.join(self.s2_path, f)) for f in s2_files
+            )
+            if has_file:
+                valid_ids.append(sample_id)
+
+        total = len(sample_ids)
+        skipped = total - len(valid_ids)
+        msg = (
+            f"MultiSenGE '{split}': "
+            f"{len(valid_ids)}/{total} samples usable "
+            f"({skipped} skipped, no files found)"
+        )
+        print(msg)
+
+        os.makedirs(params.OUTPUT, exist_ok=True)
+        stats_path = os.path.join(params.OUTPUT, "multisenge_dataset_stats.txt")
+        with open(stats_path, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {msg}\n")
+
+        return valid_ids
 
     def __iter__(self):
         """
@@ -301,6 +339,8 @@ class MultiSenGEDataset(IterableDataset):
         # collect Sentinel-2 files
         for filename in s2_files:
             path = os.path.join(self.s2_path, filename)
+            if not os.path.exists(path):
+                continue
             image_files.append(
                 {
                     "sensor": "S2",
@@ -312,6 +352,8 @@ class MultiSenGEDataset(IterableDataset):
         # collect Sentinel-1 files
         for filename in s1_files:
             path = os.path.join(self.s1_path, filename)
+            if not os.path.exists(path):
+                continue
             image_files.append(
                 {
                     "sensor": "S1",
