@@ -82,7 +82,7 @@ class PastisRDataset(IterableDataset):
         # define split by fold
         if split == "train":
             folds = [1, 2, 3]
-        elif split == "val":
+        elif split == "validation":
             folds = [4]
         # test
         else:
@@ -178,9 +178,8 @@ class PastisRDataset(IterableDataset):
             # iterate over pixels
             for pix_id in range(params.P_NUM_PIXELS):
                 # check if reached max number of samples in last sample
-                if (idx == len(self.patch_ids) - 1) and pix_id >= (
-                    self.data_length % params.P_NUM_PIXELS
-                ):
+                remainder = self.data_length % params.P_NUM_PIXELS
+                if (idx == len(self.patch_ids) - 1) and remainder != 0 and pix_id >= remainder:
                     break
                 # obtain pixel time series
                 eo_data = torch.tensor(eo_style_array[pix_id]).float().to(params.DEVICE)

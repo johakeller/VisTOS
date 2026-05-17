@@ -127,7 +127,7 @@ class FineTuning:
             )
             # test dataset
             test_ds = pastis_r_dataset.PastisRDataset(
-                split="test", max_length=params.FT_NUM_TEST_SAMPLES, shuffle=True
+                split="test", max_length=params.FT_NUM_TEST_SAMPLES, shuffle=False
             )
             # training params
             self.total_pixels = params.P_NUM_PIXELS
@@ -181,7 +181,7 @@ class FineTuning:
             )
             # test dataset
             test_ds = multitempcrop_dataset.MultiTempCropClass(
-                split="test", shuffle=True
+                split="test", shuffle=False
             )
             # training params
             self.total_pixels = params.MTCC_NUM_PIXELS
@@ -236,7 +236,7 @@ class FineTuning:
             )
             # test dataset
             test_ds = multisenge_dataset.MultiSenGEDataset(
-                split="test", shuffle=True
+                split="test", shuffle=False
             )
             # training params
             self.total_pixels = params.MULTISENGE_NUM_PIXELS
@@ -742,6 +742,11 @@ class FineTuning:
             else:
                 train_loss.append(0.0)
 
+            # log training loss
+            message = f"Training epoch {epoch + 1},\ntrain loss: {train_loss[-1]:.4f}"
+            tqdm.write(message)
+            self.logger.info(message)
+
             # VALIDATION
             model.eval()
             epoch_val_loss = 0.0
@@ -777,9 +782,9 @@ class FineTuning:
             else:
                 val_loss.append(0.0)
 
-            # loss summary for training + validation epoch
-            message = f"Training epoch {epoch + 1}: train loss: {train_loss[-1]:.4f}, validation loss: {val_loss[-1]:.4f}"
-            pbar.set_description(message)
+            # log validation loss
+            message = f"Validation epoch {epoch + 1},\nval loss: {val_loss[-1]:.4f}"
+            tqdm.write(message)
             self.logger.info(message)
 
             # early stopping
