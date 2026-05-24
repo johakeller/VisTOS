@@ -679,7 +679,7 @@ class FineTuning:
             num_batches = start_iteration + 1 if start_iteration != 0 else 0
 
             # fast-forward to start_iteration 
-            skip = start_iteration if epoch == start_epoch else 0
+            skip = start_iteration + 1 if epoch == start_epoch and start_iteration != 0 else 0
             train_iter = iter(train_dl)
             if skip > 0:
                 print(f"\rEpoch {epoch + 1}/{self.epochs}: skipping {skip} batches to resume from checkpoint.{params.EOL_SPACE}", end="")
@@ -688,7 +688,14 @@ class FineTuning:
 
             # iterate through the mini-batches
             for iteration, input_dict in enumerate(
-                tqdm(train_iter, desc=f"Epoch {epoch + 1}/{self.epochs} training", leave=True, dynamic_ncols=True),
+                tqdm(
+                    train_iter, 
+                    desc=f"Epoch {epoch + 1}/{self.epochs} training",
+                    total=dataloader_len, 
+                    initial=skip,
+                    leave=True, 
+                    dynamic_ncols=True,
+                    ),
                 start=skip,
             ):
                 # extract labels from dictionary
