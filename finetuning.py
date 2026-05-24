@@ -326,7 +326,7 @@ class FineTuning:
         message = (
             f'\rFine-tuning VisTOS {"CVF size" if model_type == "conv" else ("Presto Large" if model_type == "presto_large" else "VF size")} {self.vis_field_size} on {self.dataset}, '
             f"batch size: {batch_size}, "
-            f"number of training batches per epoch: {len(train_dl)}, validation batchesper epoch {len(val_dl)}, "
+            f"number of train/val batches per epoch: {len(train_dl)}/{len(val_dl)}, "
             f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
         )
         print(message)
