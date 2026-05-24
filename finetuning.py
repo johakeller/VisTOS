@@ -270,15 +270,6 @@ class FineTuning:
         else:
             raise ValueError(f"Dataset {self.dataset} unknown.")
 
-        # print and log info
-        message = (
-            f'\rFine-tuning VisTOS {"CVF size" if model_type == "conv" else ("Presto Large" if model_type == "presto_large" else "VF size")} {self.vis_field_size} on {self.dataset}, '
-            f"batch size {batch_size}, "
-            f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
-        )
-        print(message)
-        self.logger.info(message)
-
         # Focal Tversky loss for rare classes
         loss_1 = TverskyLoss(
             mode=mode,
@@ -330,6 +321,17 @@ class FineTuning:
             num_workers=params.FT_NUM_WORKERS,
             drop_last=True,
         )
+
+        # print and log info
+        message = (
+            f'\rFine-tuning VisTOS {"CVF size" if model_type == "conv" else ("Presto Large" if model_type == "presto_large" else "VF size")} {self.vis_field_size} on {self.dataset}, '
+            f"batch size: {batch_size}, "
+            f"number of batches per epoch: {len(train_dl)}, val batches/epoch {len(val_dl)}, "
+            f'{datetime.now().strftime("%d-%m-%Y %H:%M")}\t'
+        )
+        print(message)
+        self.logger.info(message)
+
         # start fine-tuning procedure if eval_mode is False
         if not eval_mode:
             # run fine-tuning, returns the fine-tuned model
