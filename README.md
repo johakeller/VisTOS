@@ -93,7 +93,7 @@
 
 #### MultiSenGE dataset:
 
-1.  Obtain the **MultiSenGE** dataset from: https://zenodo.org/records/6375084, change the constant
+1.  Obtain the **MultiSenGE** dataset from: https://zenodo.org/records/6375466, change the constant
     `MULTISENGE_ROOT_DIR` in `params` accordingly. 
 2.  Create the selected subset and train/validation/test split files:
     ```bash
@@ -141,7 +141,7 @@ Code: https://github.com/VSainteuf/pastis-benchmark/blob/main/code/dataloader.py
 
 The MultiSenGE dataset in the module `multisenge_dataset.py` originates from:
 
-Schmitt, M., et al. (2021). **MultiSenGE.** Zenodo. https://zenodo.org/records/6375084
+Schmitt, M., et al. (2021). **MultiSenGE.** Zenodo. https://zenodo.org/records/6375466
 
 The MTCC dataset originates from: 
 
